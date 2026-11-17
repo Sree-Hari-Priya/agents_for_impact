@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 import time
-from playwright.sync_api import sync_playwright
+try:
+    from playwright.sync_api import sync_playwright
+except ImportError:
+    sync_playwright = None
 
 LIVE_URL = "https://early-intervention-triage-584075988667.us-central1.run.app/"
 SCREENSHOT_PATH = Path(__file__).resolve().parent / "live_cloudrun_verified.png"
@@ -53,6 +56,10 @@ def _launch_browser(p):
 
 
 def run_live_audit() -> None:
+    if sync_playwright is None:
+        print("Playwright not installed, skipping live browser audit.")
+        return
+
     print("=" * 78)
     print(f"PLAYWRIGHT LIVE CLOUD RUN AUDIT: {LIVE_URL}")
     print("=" * 78)

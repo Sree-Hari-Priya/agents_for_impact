@@ -4,9 +4,12 @@ Exposes REST endpoints for the ADK agent, graph analysis, pathway routing, and e
 Includes an interactive dashboard web UI for IDEA Part C coordinators.
 """
 
+import datetime
+import json
 import os
 import sys
-from typing import Optional, Dict, Any
+import uuid
+from typing import Optional, Dict, Any, List
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,6 +28,9 @@ from agent.tools import (
     simulate_single_network_fix,
     validate_pre_handoff_packet,
     resolve_geographic_location_and_nearest_clinics,
+    execute_multi_agent_triage_with_traces,
+    fetch_recent_bq_traces,
+    log_agent_trace_to_bigquery,
 )
 from google.adk import Runner
 from google.adk.sessions import InMemorySessionService
@@ -80,6 +86,25 @@ async def chat(req: ChatRequest):
                 if hasattr(part, "text") and part.text:
                     full_response += part.text
 
+    # Trace log chat interaction to BigQuery
+    try:
+        log_agent_trace_to_bigquery([{
+            "trace_id": str(uuid.uuid4()),
+            "session_id": session_id,
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "child_age_months": None,
+            "census_tract_geoid": None,
+            "requires_medicaid": None,
+            "requires_bilingual": None,
+            "agent_name": "milestone_navigator_agent",
+            "event_type": "CHAT_INTERACTION",
+            "status": "SUCCESS",
+            "latency_ms": 0.0,
+            "details_json": json.dumps({"user_prompt": req.message[:120], "response_preview": full_response[:120]}),
+        }])
+    except Exception:
+        pass
+
     return {
         "session_id": session_id,
         "response": full_response
@@ -104,13 +129,21 @@ def geo_resolve(req: GeoResolveRequest):
 
 @app.post("/api/triage/route")
 def triage_route(req: TriageRequest):
-    return find_compliant_toddler_pathway(
+    return execute_multi_agent_triage_with_traces(
         child_age_months=req.child_age_months,
-        census_tract_geoid=req.census_tract_geoid,
+        census_tract_geoid=req.census_tract_geoid or "36005019700",
         requires_medicaid=req.requires_medicaid,
         requires_bilingual=req.requires_bilingual,
-        max_wait_days=req.max_wait_days
+        max_wait_days=req.max_wait_days,
+        state_code="NY",
     )
+
+@app.get("/api/traces/recent")
+def get_recent_traces(limit: int = 25):
+    return {
+        "status": "success",
+        "traces": fetch_recent_bq_traces(limit=limit)
+    }
 
 @app.get("/api/audit/equity")
 def equity_audit():
@@ -189,21 +222,43 @@ def index():
   <style>
     :root {
       /* Warm, nurturing child-saving pastel palette */
-      --pastel-sky: #e0f2fe;        /* Soft gentle baby sky blue */
-      --pastel-sky-deep: #38bdf8;   /* Sky accent */
-      --pastel-mint: #dcfce7;       /* Gentle healing mint green */
-      --pastel-mint-deep: #22c55e;  /* Vitality green */
-      --pastel-peach: #ffedd5;      /* Warm nurturing soft peach */
-      --pastel-rose: #ffe4e6;       /* Gentle caring rose */
-      --pastel-rose-deep: #fb7185;  /* Rose alert */
-      --pastel-lavender: #f3e8ff;   /* Calming soft lavender */
-      --pastel-lavender-deep: #c084fc;
-      --pastel-butter: #fef9c3;     /* Warm sunshine buttercup */
-      --primary-color: #0284c7;     /* Ocean/Sky primary */
-      --card-radius: 1.15rem;
+      --pastel-sky: #f0f9ff;
+      --pastel-sky-soft: #e0f2fe;
+      --pastel-sky-accent: #38bdf8;
+      --pastel-sky-dark: #0284c7;
+
+      --pastel-mint: #f0fdf4;
+      --pastel-mint-soft: #dcfce7;
+      --pastel-mint-accent: #86efac;
+      --pastel-mint-dark: #16a34a;
+
+      --pastel-peach: #fff7ed;
+      --pastel-peach-soft: #ffedd5;
+      --pastel-peach-accent: #fdba74;
+      --pastel-peach-dark: #ea580c;
+
+      --pastel-rose: #fff1f2;
+      --pastel-rose-soft: #ffe4e6;
+      --pastel-rose-accent: #fda4af;
+      --pastel-rose-dark: #e11d48;
+
+      --pastel-lavender: #faf5ff;
+      --pastel-lavender-soft: #f3e8ff;
+      --pastel-lavender-accent: #d8b4fe;
+      --pastel-lavender-dark: #9333ea;
+
+      --pastel-butter: #fefce8;
+      --pastel-butter-soft: #fef9c3;
+      --pastel-butter-accent: #fde047;
+      --pastel-butter-dark: #ca8a04;
+
+      --primary-color: #0284c7;
+      --card-radius: 1.25rem;
+      --card-shadow: 0 8px 28px rgba(148, 163, 184, 0.12);
+      --card-shadow-hover: 0 12px 36px rgba(148, 163, 184, 0.18);
     }
     body {
-      background: linear-gradient(180deg, #f0fdf4 0%, #f8fafc 40%, #fefce8 100%);
+      background: linear-gradient(180deg, #fdfbf7 0%, #f0fdf4 30%, #faf5ff 65%, #f0f9ff 100%);
       font-family: 'Nunito', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       color: #1e293b;
       min-height: 100vh;
@@ -212,103 +267,119 @@ def index():
       font-family: 'Quicksand', 'Nunito', sans-serif;
     }
     .hero {
-      background: linear-gradient(135deg, #0284c7 0%, #0d9488 45%, #ec4899 100%);
+      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 35%, #f472b6 70%, #fb923c 100%);
       color: white;
       padding: 2.2rem 1.5rem 1.9rem;
       margin-bottom: 2rem;
-      border-bottom: 5px solid rgba(254, 240, 138, 0.4);
-      box-shadow: 0 8px 30px rgba(13, 148, 136, 0.2);
+      border-bottom: 5px solid rgba(254, 240, 138, 0.5);
+      box-shadow: 0 10px 32px rgba(129, 140, 248, 0.25);
       position: relative;
       overflow: hidden;
     }
     .hero::before {
       content: "";
       position: absolute;
-      top: -50%;
+      top: -40%;
       right: -10%;
-      width: 400px;
-      height: 400px;
-      background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+      width: 450px;
+      height: 450px;
+      background: radial-gradient(circle, rgba(255,255,255,0.22) 0%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      bottom: -30%;
+      left: -5%;
+      width: 350px;
+      height: 350px;
+      background: radial-gradient(circle, rgba(254,249,195,0.25) 0%, transparent 70%);
       border-radius: 50%;
       pointer-events: none;
     }
     .card {
       border-radius: var(--card-radius);
-      border: 1px solid rgba(203, 213, 225, 0.5);
-      box-shadow: 0 4px 20px rgba(148, 163, 184, 0.12);
+      border: 1px solid rgba(226, 232, 240, 0.85);
+      box-shadow: var(--card-shadow);
       margin-bottom: 1.5rem;
       background: #ffffff;
-      transition: all 0.2s ease-in-out;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .card:hover {
-      box-shadow: 0 8px 25px rgba(148, 163, 184, 0.18);
+      box-shadow: var(--card-shadow-hover);
+      transform: translateY(-2px);
     }
     .stat-badge {
-      font-size: 1.65rem;
+      font-size: 1.7rem;
       font-weight: 800;
       letter-spacing: -0.5px;
     }
     .badge-breach { 
-      background-color: #f43f5e; 
-      color: white; 
-      box-shadow: 0 2px 6px rgba(244, 63, 94, 0.25);
+      background-color: #fb7185; 
+      color: #881337; 
+      border: 1px solid #fda4af;
+      box-shadow: 0 2px 8px rgba(251, 113, 133, 0.25);
     }
     .badge-pass { 
-      background-color: #10b981; 
-      color: white; 
-      box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+      background-color: #86efac; 
+      color: #14532d; 
+      border: 1px solid #bbf7d0;
+      box-shadow: 0 2px 8px rgba(134, 239, 172, 0.25);
     }
     .chat-box {
       height: 420px;
       overflow-y: auto;
       background: #fdfbf7;
       border: 1px solid #fed7aa;
-      border-radius: 1rem;
+      border-radius: 1.15rem;
       padding: 1.2rem;
     }
     .msg-user {
-      background: linear-gradient(135deg, #0284c7, #0284c7);
-      color: #ffffff;
-      border-radius: 1.1rem 1.1rem 0.25rem 1.1rem;
-      padding: 0.8rem 1.15rem;
+      background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+      color: #0369a1;
+      border: 1px solid #7dd3fc;
+      border-radius: 1.25rem 1.25rem 0.35rem 1.25rem;
+      padding: 0.85rem 1.2rem;
       margin-bottom: 0.85rem;
       max-width: 82%;
       margin-left: auto;
-      box-shadow: 0 3px 10px rgba(2, 132, 199, 0.25);
+      box-shadow: 0 4px 14px rgba(56, 189, 248, 0.18);
+      font-weight: 600;
     }
     .msg-agent {
-      background-color: #ffffff;
+      background: #ffffff;
       color: #0f172a;
-      border: 1px solid #e0e7ff;
-      border-left: 4px solid #38bdf8;
-      border-radius: 1.1rem 1.1rem 1.1rem 0.25rem;
-      padding: 0.85rem 1.15rem;
+      border: 1px solid #e9d5ff;
+      border-left: 5px solid #c084fc;
+      border-radius: 1.25rem 1.25rem 1.25rem 0.35rem;
+      padding: 0.95rem 1.25rem;
       margin-bottom: 0.85rem;
       max-width: 88%;
       white-space: pre-wrap;
-      box-shadow: 0 3px 10px rgba(148, 163, 184, 0.1);
-      line-height: 1.55;
+      box-shadow: 0 4px 16px rgba(192, 132, 252, 0.1);
+      line-height: 1.6;
     }
     .track-nav-btn {
       border-radius: 2rem !important;
       padding: 0.65rem 1.3rem;
       font-weight: 700;
       font-size: 0.92rem;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
       border: 1px solid rgba(255, 255, 255, 0.45);
-      background: rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.18);
       color: #ffffff;
-      backdrop-filter: blur(4px);
+      backdrop-filter: blur(6px);
     }
     .track-nav-btn:hover {
-      background: rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.32);
       color: #ffffff;
-      transform: translateY(-1px);
+      transform: translateY(-2px);
     }
     .track-nav-btn.active {
       background: #ffffff !important;
-      color: #0f766e !important;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+      color: #0284c7 !important;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
       transform: translateY(-2px);
       border-color: #ffffff !important;
     }
@@ -324,27 +395,31 @@ def index():
       to { opacity: 1; transform: translateY(0); }
     }
     .kpi-card {
-      transition: all 0.25s ease;
-      border-radius: 1.1rem;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: 1.25rem;
     }
     .kpi-card:hover {
-      transform: translateY(-3px);
+      transform: translateY(-4px);
     }
     .kpi-card-breach {
       background: linear-gradient(145deg, #fff1f2 0%, #ffffff 100%);
       border: 1px solid #fecdd3;
+      box-shadow: 0 4px 16px rgba(244, 63, 94, 0.08);
     }
     .kpi-card-bounce {
-      background: linear-gradient(145deg, #fffbeb 0%, #ffffff 100%);
-      border: 1px solid #fef08a;
+      background: linear-gradient(145deg, #fff7ed 0%, #ffffff 100%);
+      border: 1px solid #fed7aa;
+      box-shadow: 0 4px 16px rgba(249, 115, 22, 0.08);
     }
     .kpi-card-saved {
       background: linear-gradient(145deg, #f0fdf4 0%, #ffffff 100%);
       border: 1px solid #bbf7d0;
+      box-shadow: 0 4px 16px rgba(34, 197, 94, 0.08);
     }
     .kpi-card-pathway {
       background: linear-gradient(145deg, #f0f9ff 0%, #ffffff 100%);
       border: 1px solid #bae6fd;
+      box-shadow: 0 4px 16px rgba(2, 132, 199, 0.08);
     }
     .table-custom th {
       background: #f8fafc;
@@ -356,36 +431,62 @@ def index():
       border: none;
     }
     .form-control, .form-select {
-      border-radius: 0.75rem;
+      border-radius: 0.85rem;
       border-color: #cbd5e1;
-      padding: 0.55rem 0.85rem;
+      padding: 0.6rem 0.95rem;
+      transition: all 0.2s ease;
     }
     .form-control:focus, .form-select:focus {
-      border-color: #0284c7;
-      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.18);
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.22);
     }
     .btn-primary {
-      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%);
       border-color: #0284c7;
-      border-radius: 0.75rem;
-      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
+      border-radius: 0.85rem;
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.22);
+      font-weight: 700;
+      transition: all 0.2s ease;
     }
     .btn-primary:hover {
-      background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+      background: linear-gradient(135deg, #0369a1 0%, #0284c7 100%);
       border-color: #0369a1;
-      transform: translateY(-1px);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(2, 132, 199, 0.3);
     }
     .child-safety-badge {
       display: inline-flex;
       align-items: center;
       gap: 0.4rem;
-      background: rgba(254, 240, 138, 0.25);
-      color: #fef08a;
+      background: rgba(254, 240, 138, 0.35);
+      color: #854d0e;
       padding: 0.35rem 0.85rem;
       border-radius: 2rem;
       font-weight: 700;
       font-size: 0.82rem;
-      border: 1px solid rgba(254, 240, 138, 0.45);
+      border: 1px solid rgba(254, 240, 138, 0.6);
+    }
+    .pastel-pill-chip {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 2rem;
+      padding: 0.32rem 0.85rem;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #334155;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      box-shadow: 0 2px 6px rgba(148, 163, 184, 0.1);
+      text-decoration: none;
+    }
+    .pastel-pill-chip:hover {
+      background: #f0fdf4;
+      border-color: #86efac;
+      color: #15803d;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(34, 197, 94, 0.15);
     }
   </style>
 </head>
@@ -397,19 +498,20 @@ def index():
           <img
             src="https://images.unsplash.com/photo-1596464716127-f2a82984de30?auto=format&fit=crop&w=240&q=80"
             alt="Toddler stacking wooden milestone blocks (Illustrative Only — Zero Real Patient PII)"
-            style="width: 80px; height: 80px; object-fit: cover; border-radius: 50%; border: 3px solid #fef9c3; box-shadow: 0 4px 14px rgba(0,0,0,0.18);"
+            style="width: 82px; height: 82px; object-fit: cover; border-radius: 50%; border: 3.5px solid #fef9c3; box-shadow: 0 6px 20px rgba(0,0,0,0.2);"
           />
           <div>
             <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
-              <span class="badge rounded-pill px-3 py-1 fw-bold" style="background:#fef9c3; color:#854d0e;"><i class="fa-solid fa-heart-pulse me-1 text-danger"></i>Saving Children's Milestones</span>
-              <span class="badge rounded-pill px-3 py-1 fw-semibold" style="background:rgba(255,255,255,0.22); color:#ffffff;"><i class="fa-solid fa-shield-halved me-1"></i>IDEA Part C 45-Day Statutory Protection</span>
+              <span class="badge rounded-pill px-3 py-1 fw-bold shadow-xs" style="background:#fef9c3; color:#854d0e; border: 1px solid #fef08a;"><i class="fa-solid fa-shapes me-1 text-warning"></i>Saving Children's Milestones</span>
+              <span class="badge rounded-pill px-3 py-1 fw-bold shadow-xs" style="background:rgba(255,255,255,0.25); color:#ffffff; border: 1px solid rgba(255,255,255,0.45); backdrop-filter: blur(4px);"><i class="fa-solid fa-shield-heart me-1 text-danger"></i>IDEA Part C 45-Day Statutory Protection</span>
+              <span class="badge rounded-pill px-3 py-1 fw-bold shadow-xs" style="background:#dcfce7; color:#14532d; border: 1px solid #bbf7d0;"><i class="fa-solid fa-baby me-1 text-success"></i>Zero Lost Referrals</span>
             </div>
-            <h1 class="h2 mb-1 fw-bold" style="letter-spacing:-0.5px;">First Milestones: Triage &amp; Network-Audit</h1>
-            <p class="mb-0 text-white-50 small">Every child deserves evaluation within 45 days · BigQuery ISO GQL Graph · Vertex AI Gemini</p>
+            <h1 class="h2 mb-1 fw-bold text-white" style="letter-spacing:-0.5px; text-shadow: 0 2px 8px rgba(0,0,0,0.15);">First Milestones: Triage &amp; Network-Audit</h1>
+            <p class="mb-0 text-white-50 small" style="font-weight: 500;">Every infant and toddler deserves developmental evaluation within 45 days · BigQuery ISO GQL Graph · Vertex AI Gemini</p>
           </div>
         </div>
         <div class="text-end">
-          <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill fw-bold small shadow-sm" style="background:#fef08a; color:#713f12;">
+          <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill fw-bold small shadow-sm" style="background:#fef9c3; color:#713f12; border: 1px solid #fef08a;">
             <i class="fa-solid fa-location-dot text-danger"></i> Active State: New York (NY · FIPS 36)
           </div>
           <div class="small mt-1 text-white-50">89 Census Tracts · 30 CareNodes · 100% [Synthetic] Network</div>
@@ -417,12 +519,15 @@ def index():
       </div>
 
       <!-- Functional Track Navigation Switcher -->
-      <div class="mt-4 pt-3 border-top border-white border-opacity-20 d-flex flex-wrap justify-content-between align-items-center gap-3">
+      <div class="mt-4 pt-3 border-top border-white border-opacity-25 d-flex flex-wrap justify-content-between align-items-center gap-3">
         <div class="d-flex align-items-center gap-2">
           <span class="small text-uppercase fw-bold text-white-50 me-2"><i class="fa-solid fa-child me-1"></i> Care Navigator:</span>
           <div class="btn-group" role="group" aria-label="Track Navigation">
             <button id="btnTrack1" type="button" class="btn btn-sm btn-light track-nav-btn active" onclick="activateTrack(1)">
               <i class="fa-solid fa-hands-holding-child me-1 text-primary"></i> Track 1: Today's Referral
+            </button>
+            <button id="btnTrack4" type="button" class="btn btn-sm btn-outline-light track-nav-btn fw-semibold" onclick="activateTrack(4)">
+              🌱 Extra Credit: Simulator
             </button>
             <button id="btnTrack2" type="button" class="btn btn-sm btn-outline-light track-nav-btn" onclick="activateTrack(2)">
               <i class="fa-solid fa-network-wired me-1"></i> Track 2: This Quarter's Audit
@@ -430,12 +535,9 @@ def index():
             <button id="btnTrack3" type="button" class="btn btn-sm btn-outline-light track-nav-btn" onclick="activateTrack(3)">
               <i class="fa-solid fa-van-shuttle me-1"></i> Track 3: Outreach Season
             </button>
-            <button id="btnTrack4" type="button" class="btn btn-sm btn-outline-light fw-semibold" onclick="activateTrack(4)">
-              🌱 Track 4: Single Network Fix Simulator
-            </button>
           </div>
         </div>
-        <div id="trackBannerInfo" class="small text-white px-3 py-1 rounded-pill" style="background: rgba(255,255,255,0.18); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.3);">
+        <div id="trackBannerInfo" class="small text-white px-3 py-1 rounded-pill" style="background: rgba(255,255,255,0.2); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.35);">
           <strong>Track 1:</strong> Route today's toddler referral (&le;45d compliant path with 36m age cliff guard).
         </div>
       </div>
@@ -447,30 +549,30 @@ def index():
     <div class="row g-3 mb-4">
       <div class="col-6 col-lg-3">
         <div class="card p-3 text-center kpi-card kpi-card-breach h-100">
-          <div class="stat-badge text-danger" style="color:#e11d48 !important;"><i class="fa-solid fa-triangle-exclamation me-1" style="font-size:1.1rem;"></i>26 / 35</div>
-          <div class="small fw-bold text-dark mt-1">Chains Breaching 45d Clock</div>
-          <div class="text-muted small mt-1" style="font-size:0.75rem;">Exposed by BigQuery ISO GQL</div>
+          <div class="stat-badge text-danger" style="color:#be123c !important;"><i class="fa-solid fa-heart-circle-exclamation me-1" style="font-size:1.15rem; color:#f43f5e;"></i>26 / 35</div>
+          <div class="small fw-bold text-dark mt-1">Children at Risk of Age-Out</div>
+          <div class="text-muted small mt-1" style="font-size:0.75rem;">Breaching 45d Statutory Clock</div>
         </div>
       </div>
       <div class="col-6 col-lg-3">
         <div class="card p-3 text-center kpi-card kpi-card-bounce h-100">
-          <div class="stat-badge text-warning" style="color:#d97706 !important;"><i class="fa-solid fa-hourglass-half me-1" style="font-size:1.1rem;"></i>5 - 6 Days</div>
-          <div class="small fw-bold text-dark mt-1">Deceptive "Bounce Hub" Wait</div>
+          <div class="stat-badge text-warning" style="color:#c2410c !important;"><i class="fa-solid fa-hourglass-half me-1" style="font-size:1.15rem; color:#fb923c;"></i>5 - 6 Days</div>
+          <div class="small fw-bold text-dark mt-1">Deceptive "Bounce Hub" Delay</div>
           <div class="text-secondary small mt-1" style="font-size:0.75rem;">Conceals downstream fax loops</div>
         </div>
       </div>
       <div class="col-6 col-lg-3">
         <div class="card p-3 text-center kpi-card kpi-card-saved h-100">
-          <div class="stat-badge text-success" style="color:#059669 !important;"><i class="fa-solid fa-shield-heart me-1" style="font-size:1.1rem;"></i>1,168 Days</div>
+          <div class="stat-badge text-success" style="color:#15803d !important;"><i class="fa-solid fa-shield-heart me-1" style="font-size:1.15rem; color:#22c55e;"></i>1,168 Days</div>
           <div class="small fw-bold text-dark mt-1">Child-Days Saved by EHR Upgrade</div>
           <div class="text-secondary small mt-1" style="font-size:0.75rem;">100% breaches eliminated</div>
         </div>
       </div>
       <div class="col-6 col-lg-3">
         <div class="card p-3 text-center kpi-card kpi-card-pathway h-100">
-          <div class="stat-badge text-info" style="color:#0284c7 !important;"><i class="fa-solid fa-baby me-1" style="font-size:1.1rem;"></i>17 - 22 Days</div>
-          <div class="small fw-bold text-dark mt-1">Graph-Optimized Child Pathway</div>
-          <div class="text-secondary small mt-1" style="font-size:0.75rem;">Guaranteed &le;45d IDEA Part C</div>
+          <div class="stat-badge text-info" style="color:#0369a1 !important;"><i class="fa-solid fa-baby me-1" style="font-size:1.15rem; color:#38bdf8;"></i>17 - 22 Days</div>
+          <div class="small fw-bold text-dark mt-1">Protected IDEA Part C Route</div>
+          <div class="text-secondary small mt-1" style="font-size:0.75rem;">Guaranteed &le;45d for every toddler</div>
         </div>
       </div>
     </div>
@@ -482,36 +584,45 @@ def index():
       <div class="row g-4">
         <!-- Quick Triage Routing Panel -->
         <div class="col-lg-5">
-          <div class="card p-4 h-100">
+          <div class="card p-4 h-100" style="background: linear-gradient(180deg, #fdfbf7 0%, #ffffff 100%); border-radius: 1.25rem;">
             <div class="d-flex align-items-center justify-content-between mb-2">
-              <h5 class="card-title mb-0 fw-bold"><i class="fa-solid fa-compass text-primary me-2"></i>Today's Referral Navigator</h5>
-              <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Statutory Clock: 45 Days</span>
+              <h5 class="card-title mb-0 fw-bold" id="triageCardTitle"><i class="fa-solid fa-compass text-primary me-2"></i>Today's Referral Navigator</h5>
+              <div class="d-flex align-items-center gap-2">
+                <div class="btn-group btn-group-sm" role="group" aria-label="Input Language Toggle">
+                  <button type="button" id="btnLangEn" class="btn btn-xs btn-primary active py-0 px-2 fw-semibold" style="font-size:0.75rem; border-radius: 1rem 0 0 1rem;" onclick="setInterfaceLanguage('en')">🇺🇸 EN</button>
+                  <button type="button" id="btnLangEs" class="btn btn-xs btn-outline-primary py-0 px-2 fw-semibold" style="font-size:0.75rem; border-radius: 0 1rem 1rem 0;" onclick="setInterfaceLanguage('es')">🇪🇸 ES</button>
+                </div>
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2 py-1" id="triageStatutoryClockBadge">Statutory Clock: 45 Days</span>
+              </div>
             </div>
-            <p class="text-muted small mb-3">
+            <p class="text-muted small mb-3" id="triageDescriptionText">
               Enter the child's natural geographic location (ZIP Code, City, or Census Tract GEOID) to resolve nearest screening centers and calculate a guaranteed &le;45d IDEA Part C pathway.
             </p>
 
             <!-- Natural Geographic Input -->
-            <div class="mb-3 p-2 bg-light rounded-3 border">
+            <div class="mb-3 p-3 rounded-4 border" style="background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%); border-color: #e2e8f0 !important;">
               <label class="form-label small fw-bold mb-1 d-flex justify-content-between">
-                <span><i class="fa-solid fa-map-location-dot text-danger me-1"></i>Location (ZIP, City, or Census GEOID)</span>
-                <span id="geoMatchBadge" class="badge bg-secondary" style="font-size:0.7rem;">Auto-Resolving</span>
+                <span id="geoInputLabel"><i class="fa-solid fa-map-location-dot text-danger me-1"></i>Location (ZIP, City, or Census GEOID)</span>
+                <span id="geoMatchBadge" class="badge rounded-pill" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:0.7rem;">Auto-Resolving</span>
               </label>
-              <div class="input-group input-group-sm mb-1">
+              <div class="input-group input-group-sm mb-2">
                 <input type="text" id="geoInput" class="form-control" value="10451" placeholder="e.g. 10451, Bronx, Jamestown, Lockport, or 36005019700" oninput="debounceGeoResolve()">
                 <button class="btn btn-outline-primary" type="button" onclick="resolveLocationNow()">
                   <i class="fa-solid fa-magnifying-glass-location"></i>
                 </button>
               </div>
               <div class="d-flex flex-wrap gap-1 mt-1 mb-1" style="font-size: 0.72rem;">
-                <span class="text-muted me-1">Quick Select:</span>
-                <a href="javascript:void(0)" class="badge bg-white text-primary border text-decoration-none" onclick="setGeoLocation('10451')">10451 (Bronx)</a>
-                <a href="javascript:void(0)" class="badge bg-white text-primary border text-decoration-none" onclick="setGeoLocation('14094')">14094 (Lockport)</a>
-                <a href="javascript:void(0)" class="badge bg-white text-primary border text-decoration-none" onclick="setGeoLocation('13617')">13617 (Canton)</a>
-                <a href="javascript:void(0)" class="badge bg-white text-primary border text-decoration-none" onclick="setGeoLocation('14701')">14701 (Jamestown)</a>
+                <span class="text-muted me-1 align-self-center" id="quickSelectLabel">Quick Select:</span>
+                <a href="javascript:void(0)" class="pastel-pill-chip" onclick="setGeoLocation('10451')">10451 (Bronx)</a>
+                <a href="javascript:void(0)" class="pastel-pill-chip" onclick="setGeoLocation('10025')">10025 (Manhattan)</a>
+                <a href="javascript:void(0)" class="pastel-pill-chip" onclick="setGeoLocation('14094')">14094 (Lockport)</a>
+                <a href="javascript:void(0)" class="pastel-pill-chip" onclick="setGeoLocation('13617')">13617 (Canton)</a>
+                <a href="javascript:void(0)" class="pastel-pill-chip" onclick="setGeoLocation('14701')">14701 (Jamestown)</a>
+                <a href="javascript:void(0)" class="pastel-pill-chip" onclick="setGeoLocation('13856')">13856 (Walton)</a>
+                <a href="javascript:void(0)" class="pastel-pill-chip" style="color:#be123c; border-color:#fecdd3; background:#fff1f2;" onclick="setGeoLocation('90210')">90210 (Test OOS)</a>
               </div>
               <div class="mt-2">
-                <label class="form-label small fw-semibold mb-1" style="font-size:0.75rem;">Census Tract GEOID</label>
+                <label class="form-label small fw-semibold mb-1" style="font-size:0.75rem;" id="tractGeoidLabel">Census Tract GEOID</label>
                 <input type="text" id="tractGeoid" class="form-control form-control-sm" value="36005019700" placeholder="e.g. 36005019700" onchange="runTriage()">
               </div>
               <div id="geoResolvedText" class="small text-primary fw-semibold mt-1" style="font-size:0.78rem;">
@@ -520,10 +631,10 @@ def index():
             </div>
 
             <!-- Dynamic Closest Screening Centers Preview -->
-            <div id="closestClinicsCard" class="card p-2 mb-3 bg-white border shadow-xs" style="font-size:0.78rem;">
+            <div id="closestClinicsCard" class="card p-3 mb-3 border shadow-xs" style="font-size:0.78rem; background: linear-gradient(145deg, #f0f9ff 0%, #ffffff 100%); border-color: #bae6fd !important; border-radius: 1rem;">
               <div class="fw-bold text-dark mb-1 d-flex justify-content-between align-items-center">
-                <span>🏥 Nearest Screening Centers</span>
-                <span class="text-muted" style="font-size:0.7rem;">Live Spatial Radius</span>
+                <span id="closestClinicsTitle">🏥 Nearest Screening Centers</span>
+                <span class="badge rounded-pill" style="background:#e0f2fe; color:#0369a1; font-size:0.7rem;" id="closestClinicsSubtitle">Live Spatial Radius</span>
               </div>
               <div id="closestClinicsList">
                 <div class="text-muted small">Resolving nearby pediatric screening centers...</div>
@@ -532,66 +643,72 @@ def index():
 
             <div class="row g-2 mb-3">
               <div class="col-12">
-                <label class="form-label small fw-semibold mb-1">Child Age (Months)</label>
+                <label class="form-label small fw-semibold mb-1" id="childAgeLabel">Child Age (Months)</label>
                 <input type="number" id="childAge" class="form-control" value="22" min="1" max="48" onchange="runTriage()">
-                <span class="text-muted" style="font-size:0.72rem;">Part C Cliff: 36 Months (Urgent alert triggers at 30+ months)</span>
+                <span class="text-muted" style="font-size:0.72rem;" id="childAgeHelp">Part C Cliff: 36 Months (Urgent alert triggers at 30+ months)</span>
               </div>
             </div>
 
-            <div class="p-3 bg-light rounded-3 mb-3 border">
+            <div class="p-3 rounded-4 mb-3 border" style="background: linear-gradient(180deg, #faf5ff 0%, #ffffff 100%); border-color: #e9d5ff !important;">
               <div class="form-check form-switch mb-2">
                 <input class="form-check-input" type="checkbox" id="reqMedicaid" checked onchange="runTriage()">
-                <label class="form-check-label small fw-semibold" for="reqMedicaid">Requires Medicaid Acceptance</label>
+                <label class="form-check-label small fw-semibold" for="reqMedicaid" id="reqMedicaidLabel">Requires Medicaid Acceptance</label>
               </div>
               <div class="form-check form-switch mb-1">
-                <input class="form-check-input" type="checkbox" id="reqBilingual" checked onchange="runTriage()">
-                <label class="form-check-label small fw-semibold" for="reqBilingual">Requires Bilingual Evaluator (Spanish)</label>
+                <input class="form-check-input" type="checkbox" id="reqBilingual" checked onchange="handleBilingualToggle()">
+                <label class="form-check-label small fw-semibold" for="reqBilingual" id="reqBilingualLabel">Requires Bilingual Evaluator (Spanish)</label>
               </div>
               <div id="routingCriteriaNotice" class="mt-2 pt-2 border-top small" style="font-size: 0.76rem;">
-                <span class="badge bg-purple text-white" style="background:#7c3aed;"><i class="fa-solid fa-language me-1"></i>Bilingual Spanish Mandate Active</span>
-                <span class="text-muted d-block mt-1">Locks pathway to verified bilingual evaluation hubs (Lockport NY-019). Toggle off to allow standard English/monolingual hubs.</span>
+                <span class="badge rounded-pill" style="background:#7c3aed; color:#fff;" id="bilingualBadge"><i class="fa-solid fa-language me-1"></i>Bilingual Spanish Mandate Active</span>
+                <span class="text-muted d-block mt-1" id="bilingualNoticeText">Locks pathway to verified bilingual evaluation hubs (Lockport NY-019). Toggle off to allow standard English/monolingual hubs.</span>
               </div>
             </div>
 
-            <button class="btn btn-primary w-100 fw-semibold py-2 mb-3 shadow-sm" onclick="runTriage()">
+            <button class="btn btn-primary w-100 fw-bold py-2 mb-3 shadow-sm" id="btnCalculatePathway" onclick="runTriage()" style="background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%); border: none; border-radius: 0.85rem;">
               <i class="fa-solid fa-route me-1"></i> Calculate Compliant Pathway (&le; 45d)
             </button>
 
             <!-- Triage Result Container -->
-            <div id="triageResult" class="small text-muted border rounded p-3 bg-white" style="min-height: 120px;">
+            <div id="triageResult" class="small text-muted border rounded-4 p-3 bg-white" style="min-height: 120px; box-shadow: inset 0 2px 6px rgba(0,0,0,0.02); border-color: #e2e8f0 !important;">
               <div class="text-center py-3 text-secondary">
                 <i class="fa-regular fa-circle-question fa-2x mb-2 text-muted"></i>
-                <div>Click above or toggle any switch to calculate optimal graph routing.</div>
+                <div id="triageResultPrompt">Click above or toggle any switch to calculate optimal graph routing.</div>
               </div>
             </div>
 
             <!-- Agentic Pathway Graph Viz for Today's Child -->
-            <div id="triageGraphCard" class="card p-3 mt-3 border-0 bg-dark text-white" style="display: none;">
+            <div id="triageGraphCard" class="card p-3 mt-3 border-0 bg-dark text-white" style="display: none; background: #0f172a; border-radius: 1.15rem; border: 1px solid #334155; box-shadow: 0 4px 20px rgba(15, 23, 42, 0.25);">
               <div class="d-flex justify-content-between align-items-center mb-2">
-                <h6 class="fw-bold mb-0 text-white" style="font-size: 0.85rem;">
+                <h6 class="fw-bold mb-0 text-white" style="font-size: 0.85rem;" id="triageGraphTitle">
                   <i class="fa-solid fa-diagram-project text-info me-1"></i> Pathway Handoff Graph (This Toddler)
                 </h6>
-                <button type="button" class="btn btn-xs btn-outline-info py-0 px-2" style="font-size: 0.72rem;" onclick="centerMapOnCurrentPathway()">
-                  <i class="fa-solid fa-location-crosshairs me-1"></i> View on Map
-                </button>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="btn-group btn-group-sm" role="group" aria-label="Graph Language Toggle">
+                    <button type="button" id="btnGraphLangEn" class="btn btn-xs btn-primary active py-0 px-2 fw-bold" style="font-size: 0.7rem;" onclick="setGraphLanguage('en')">EN</button>
+                    <button type="button" id="btnGraphLangEs" class="btn btn-xs btn-outline-secondary py-0 px-2 fw-bold" style="font-size: 0.7rem;" onclick="setGraphLanguage('es')">ES</button>
+                  </div>
+                  <button type="button" class="btn btn-xs btn-outline-info py-0 px-2" style="font-size: 0.72rem;" onclick="centerMapOnCurrentPathway()" id="btnGraphViewMap">
+                    <i class="fa-solid fa-location-crosshairs me-1"></i> View on Map
+                  </button>
+                </div>
               </div>
-              <svg id="svgTriagePathway" viewBox="0 0 680 130" class="w-100" style="background: #0f172a; border-radius: 6px;"></svg>
+              <svg id="svgTriagePathway" viewBox="0 0 680 130" class="w-100" style="background: #0f172a; border-radius: 8px;"></svg>
             </div>
           </div>
         </div>
 
         <!-- Live ADK Agent Interaction -->
         <div class="col-lg-7">
-          <div class="card p-4 h-100">
+          <div class="card p-4 h-100" style="background: linear-gradient(180deg, #fdfbf7 0%, #ffffff 100%); border-radius: 1.25rem;">
             <div class="d-flex align-items-center justify-content-between mb-3">
               <div>
                 <h5 class="card-title mb-0 fw-bold"><i class="fa-solid fa-heart-pulse text-danger me-2"></i>Milestone Navigator</h5>
-                <small class="text-muted">AI Casework Partner · Google ADK Multi-Agent System · BigQuery Property Graph</small>
+                <small class="text-muted" id="navigatorSubtitle">AI Casework Partner · Google ADK Multi-Agent System · BigQuery Property Graph</small>
               </div>
-              <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="fa-solid fa-circle text-success me-1" style="font-size: 7px;"></i>Navigator Online</span>
+              <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1" id="navigatorStatusBadge"><i class="fa-solid fa-circle text-success me-1" style="font-size: 7px;"></i>Navigator Online</span>
             </div>
             <div id="chatBox" class="chat-box mb-3">
-              <div class="msg-agent">👋 <strong>Hello Coordinator! I am Maya, your Milestone Navigator.</strong>
+              <div class="msg-agent" id="chatWelcomeMsg">👋 <strong>Hello Coordinator! I am Maya, your Milestone Navigator.</strong>
 
 I partner with you to ensure every infant and toddler reaches their developmental evaluation well within the federal 45-day statutory IFSP clock.
 
@@ -602,9 +719,380 @@ I partner with you to ensure every infant and toddler reaches their developmenta
 • <strong>Pre-Handoff Quality Audit:</strong> <em>"Check if referral packet for 22m Spanish toddler to coordinator SYN-PROV-NY-011 will bounce."</em>
 • <strong>Transit Check:</strong> <em>"Does Bronx tract 36005019700 trigger the zero-vehicle transit guardrail?"</em></div>
             </div>
+
+            <!-- Bilingual Quick Prompt Suggestions for Caseworkers -->
+            <div class="d-flex flex-wrap gap-1 mb-2" id="chatQuickPrompts" style="font-size: 0.72rem;">
+              <span class="text-muted small align-self-center me-1" id="chatPromptsLabel"><i class="fa-solid fa-bolt text-warning me-1"></i>Casework Prompts:</span>
+              <button type="button" class="btn btn-xs py-1 px-2 rounded-pill fw-bold shadow-xs" style="background: #f0fdf4; border: 1px solid #86efac; color: #166534;" onclick="insertPrompt('Ruta para un niño de 22 meses que habla español con Medicaid en el código postal 10451')">🇪🇸 Ruta 22m Español (10451)</button>
+              <button type="button" class="btn btn-xs py-1 px-2 rounded-pill fw-bold shadow-xs" style="background: #eff6ff; border: 1px solid #93c5fd; color: #1e40af;" onclick="insertPrompt('Redactar nota bilingüe en inglés y español para la familia Rivera y el niño Mateo')">🇪🇸 Nota Bilingüe Familia</button>
+              <button type="button" class="btn btn-xs py-1 px-2 rounded-pill fw-bold shadow-xs" style="background: #faf5ff; border: 1px solid #d8b4fe; color: #6b21a8;" onclick="insertPrompt('Route a 22-month-old Spanish-speaking Medicaid toddler living in ZIP 10451.')">🇺🇸 Route 22m Medicaid</button>
+              <button type="button" class="btn btn-xs py-1 px-2 rounded-pill fw-bold shadow-xs" style="background: #fff7ed; border: 1px solid #fdba74; color: #9a3412;" onclick="insertPrompt('What is the emergency fast-track sequence for a 32-month-old in Canton before they age out at 36 months?')">🇺🇸 32m Fast-Track</button>
+            </div>
+
             <div class="input-group">
-              <input type="text" id="userInput" class="form-control py-2" placeholder="Ask Maya (e.g. Find a pathway for a 20-month-old in ZIP 10451 on Medicaid)..." onkeydown="if(event.key==='Enter') sendMessage()">
-              <button class="btn btn-primary px-4 fw-semibold" onclick="sendMessage()"><i class="fa-solid fa-paper-plane me-1"></i> Send</button>
+              <input type="text" id="userInput" class="form-control py-2" placeholder="Ask Maya (e.g. Find a pathway for a 20-month-old in ZIP 10451 on Medicaid)..." onkeydown="if(event.key==='Enter') sendMessage()" style="border-radius: 0.85rem 0 0 0.85rem;">
+              <button class="btn btn-primary px-4 fw-bold" id="btnSendMessage" onclick="sendMessage()" style="border-radius: 0 0.85rem 0.85rem 0;"><i class="fa-solid fa-paper-plane me-1"></i> Send</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================================================================= -->
+      <!-- MULTI-AGENT TRIAGE WORK BREAKDOWN & BIGQUERY TRACE AUDIT LOG      -->
+      <!-- ================================================================= -->
+      <div class="row mt-4">
+        <div class="col-12">
+          <div class="card p-4 border shadow-sm" style="background: linear-gradient(180deg, #fdfbf7 0%, #ffffff 100%); border-radius: 1.25rem;">
+            <!-- Header -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom gap-2">
+              <div>
+                <h5 class="card-title mb-1 fw-bold text-dark d-flex align-items-center">
+                  <i class="fa-solid fa-network-wired text-primary me-2"></i>Multi-Agent Triage Execution Breakdown
+                  <span class="badge rounded-pill ms-2" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:0.75rem;">
+                    Google ADK Sequential Pipeline
+                  </span>
+                </h5>
+                <p class="text-muted small mb-0">
+                  Detailed inspection of what each specialized autonomous agent performed during this child's triage, including data inputs, algorithmic decisions, tools invoked, and clock compliance.
+                </p>
+              </div>
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-white text-secondary border p-2 rounded-pill shadow-xs" style="font-size: 0.76rem;">
+                  <i class="fa-solid fa-fingerprint me-1 text-primary"></i>Trace ID: 
+                  <span id="triageTraceIdBadge" class="font-monospace text-dark fw-bold">Live Execution Active</span>
+                </span>
+                <span id="overallTriageBadge" class="badge rounded-pill p-2" style="background:#dcfce7; color:#166534; border:1px solid #bbf7d0; font-size: 0.76rem;">
+                  <i class="fa-solid fa-circle-check me-1"></i>All 4 Agents Completed
+                </span>
+              </div>
+            </div>
+
+            <!-- 4-Agent Pipeline Workflow Cards -->
+            <div class="row g-3 row-cols-1 row-cols-md-2 row-cols-xl-4 mb-4">
+              <!-- Agent 1: Pathway Router -->
+              <div class="col">
+                <div class="card h-100 p-3 bg-white shadow-xs position-relative" style="border: 1px solid #bae6fd !important; border-top: 4px solid #38bdf8 !important; border-radius: 1.15rem;">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="badge rounded-pill" style="background:#e0f2fe; color:#0284c7; border:1px solid #bae6fd; font-size: 0.72rem; font-weight:700;">Step 1 · Router</span>
+                    <span id="agent1StatusBadge" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" style="font-size: 0.7rem;">COMPLETED</span>
+                  </div>
+                  <h6 class="fw-bold mb-1 text-dark" style="font-size: 0.9rem;">
+                    <i class="fa-solid fa-compass text-primary me-1"></i>Pathway Router Agent
+                  </h6>
+                  <div class="text-secondary small mb-2" style="font-size: 0.72rem;"><code>pathway_router_agent</code></div>
+                  
+                  <div class="mb-2 p-2 rounded small" style="background: #f0f9ff; border: 1px solid #e0f2fe; font-size: 0.74rem;">
+                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-screwdriver-wrench text-secondary me-1"></i>Tools Invoked:</strong>
+                    <div class="text-primary font-monospace" style="font-size: 0.7rem;">• resolve_geographic_location_and_nearest_clinics</div>
+                    <div class="text-primary font-monospace" style="font-size: 0.7rem;">• find_compliant_toddler_pathway</div>
+                  </div>
+
+                  <div class="small mb-2" style="font-size: 0.74rem;">
+                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-list-check text-secondary me-1"></i>What This Agent Did:</strong>
+                    <ul class="ps-3 mb-1 text-muted" id="agent1ActionsList">
+                      <li>Geocoded location to Census Tract GEOID and resolved nearest screening clinics.</li>
+                      <li>Audited 36m Part C statutory age cliff (flagging fast-track if 30+ months).</li>
+                      <li>Traversed BigQuery care graph for optimal ≤45d pathway with Medicaid & Spanish capacity.</li>
+                    </ul>
+                  </div>
+
+                  <div class="mt-auto pt-2 border-top small" style="font-size: 0.72rem;">
+                    <div class="d-flex justify-content-between text-muted">
+                      <span>Latency: <strong id="agent1Latency" class="text-dark">18.2ms</strong></span>
+                      <span id="agent1ResultHop" class="text-success fw-bold">≤ 45d Guaranteed</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Agent 2: Network Bottleneck Auditor -->
+              <div class="col">
+                <div class="card h-100 p-3 bg-white shadow-xs position-relative" style="border: 1px solid #fef08a !important; border-top: 4px solid #fde047 !important; border-radius: 1.15rem;">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="badge rounded-pill" style="background:#fef9c3; color:#854d0e; border:1px solid #fef08a; font-size: 0.72rem; font-weight:700;">Step 2 · Pre-Audit</span>
+                    <span id="agent2StatusBadge" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" style="font-size: 0.7rem;">COMPLETED</span>
+                  </div>
+                  <h6 class="fw-bold mb-1 text-dark" style="font-size: 0.9rem;">
+                    <i class="fa-solid fa-shield-halved text-warning me-1"></i>Network Audit Agent
+                  </h6>
+                  <div class="text-secondary small mb-2" style="font-size: 0.72rem;"><code>network_audit_agent</code></div>
+                  
+                  <div class="mb-2 p-2 rounded small" style="background: #fefce8; border: 1px solid #fef9c3; font-size: 0.74rem;">
+                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-screwdriver-wrench text-secondary me-1"></i>Tools Invoked:</strong>
+                    <div class="text-warning-emphasis font-monospace" style="font-size: 0.7rem;">• trace_45day_breaches_and_bounce_hubs</div>
+                    <div class="text-warning-emphasis font-monospace" style="font-size: 0.7rem;">• validate_pre_handoff_packet</div>
+                  </div>
+
+                  <div class="small mb-2" style="font-size: 0.74rem;">
+                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-list-check text-secondary me-1"></i>What This Agent Did:</strong>
+                    <ul class="ps-3 mb-1 text-muted" id="agent2ActionsList">
+                      <li>Audited Hop-2 coordinator channels to bypass deceptive 5-day paper-fax bounce hubs.</li>
+                      <li>Validated pre-handoff packet completeness (parental consent + ASQ-3 screening).</li>
+                      <li>Locked pathway to direct electronic EHR intake desk (eliminating 38d loop).</li>
+                    </ul>
+                  </div>
+
+                  <div class="mt-auto pt-2 border-top small" style="font-size: 0.72rem;">
+                    <div class="d-flex justify-content-between text-muted">
+                      <span>Latency: <strong id="agent2Latency" class="text-dark">9.4ms</strong></span>
+                      <span id="agent2PacketStatus" class="text-success fw-bold">Packet Validated</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Agent 3: Equity Auditor -->
+              <div class="col">
+                <div class="card h-100 p-3 bg-white shadow-xs position-relative" style="border: 1px solid #bbf7d0 !important; border-top: 4px solid #86efac !important; border-radius: 1.15rem;">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="badge rounded-pill" style="background:#dcfce7; color:#166534; border:1px solid #bbf7d0; font-size: 0.72rem; font-weight:700;">Step 3 · Demographics</span>
+                    <span id="agent3StatusBadge" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" style="font-size: 0.7rem;">COMPLETED</span>
+                  </div>
+                  <h6 class="fw-bold mb-1 text-dark" style="font-size: 0.9rem;">
+                    <i class="fa-solid fa-scale-balanced text-success me-1"></i>Equity Audit Agent
+                  </h6>
+                  <div class="text-secondary small mb-2" style="font-size: 0.72rem;"><code>equity_audit_agent</code></div>
+                  
+                  <div class="mb-2 p-2 rounded small" style="background: #f0fdf4; border: 1px solid #dcfce7; font-size: 0.74rem;">
+                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-screwdriver-wrench text-secondary me-1"></i>Tools Invoked:</strong>
+                    <div class="text-success font-monospace" style="font-size: 0.7rem;">• run_equity_and_counterfactual_audit</div>
+                  </div>
+
+                  <div class="small mb-2" style="font-size: 0.74rem;">
+                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-list-check text-secondary me-1"></i>What This Agent Did:</strong>
+                    <ul class="ps-3 mb-1 text-muted" id="agent3ActionsList">
+                      <li>Audited Census tract under-5 poverty and zero-vehicle household demographics.</li>
+                      <li>Assessed transit burden; deployed transportation assistance guardrail if zero-vehicle >15%.</li>
+                      <li>Calculated counterfactual days saved (+23d to +38d) vs legacy paper fax.</li>
+                    </ul>
+                  </div>
+
+                  <div class="mt-auto pt-2 border-top small" style="font-size: 0.72rem;">
+                    <div class="d-flex justify-content-between text-muted">
+                      <span>Latency: <strong id="agent3Latency" class="text-dark">6.1ms</strong></span>
+                      <span id="agent3TransitStatus" class="text-success fw-bold">Guardrail Active</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Agent 4: Caregiver Note Agent -->
+              <div class="col">
+                <div class="card h-100 p-3 bg-white shadow-xs position-relative" style="border: 1px solid #e9d5ff !important; border-top: 4px solid #d8b4fe !important; border-radius: 1.15rem;">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="badge rounded-pill" style="background:#f3e8ff; color:#7c3aed; border:1px solid #e9d5ff; font-size: 0.72rem; font-weight:700;">Step 4 · Caregiver</span>
+                    <span id="agent4StatusBadge" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" style="font-size: 0.7rem;">COMPLETED</span>
+                  </div>
+                  <h6 class="fw-bold mb-1 text-dark" style="font-size: 0.9rem;">
+                    <i class="fa-solid fa-language me-1" style="color:#7c3aed;"></i>Caregiver Note Agent
+                  </h6>
+                  <div class="text-secondary small mb-2" style="font-size: 0.72rem;"><code>caregiver_note_agent</code></div>
+                  
+                  <div class="mb-2 p-2 rounded small" style="background: #faf5ff; border: 1px solid #f3e8ff; font-size: 0.74rem;">
+                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-screwdriver-wrench text-secondary me-1"></i>Tools Invoked:</strong>
+                    <div class="font-monospace" style="color:#7c3aed; font-size: 0.7rem;">• format_bilingual_caregiver_note</div>
+                  </div>
+
+                  <div class="small mb-2" style="font-size: 0.74rem;">
+                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-list-check text-secondary me-1"></i>What This Agent Did:</strong>
+                    <ul class="ps-3 mb-1 text-muted" id="agent4ActionsList">
+                      <li>Synthesized clinical handoff data into plain-language, jargon-free parent action steps.</li>
+                      <li>Drafted synchronized dual-language English and Spanish letters with coordinator direct lines.</li>
+                      <li>Incorporated 34 CFR § 303.310 statutory 45-day evaluation guarantee rights.</li>
+                    </ul>
+                  </div>
+
+                  <div class="mt-auto pt-2 border-top small" style="font-size: 0.72rem;">
+                    <div class="d-flex justify-content-between text-muted">
+                      <span>Latency: <strong id="agent4Latency" class="text-dark">4.9ms</strong></span>
+                      <span id="agent4NoteStatus" class="fw-bold" style="color:#7c3aed;">Bilingual Ready</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- BigQuery Trace Telemetry Sub-Panel -->
+            <div class="card p-3 border shadow-xs" style="background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%); border-radius: 1.15rem;">
+              <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
+                <div>
+                  <h6 class="fw-bold mb-0 text-dark d-flex align-items-center">
+                    <i class="fa-solid fa-database text-primary me-2"></i>BigQuery Trace Audit Log
+                    <code class="ms-2 small text-secondary" style="font-size: 0.75rem;">qwiklabs-gcp-03-4b836a7f2e04.a4i_early_intervention.triage_agent_execution_traces</code>
+                  </h6>
+                  <span class="text-muted small" style="font-size: 0.74rem;">
+                    Every multi-agent execution event, parameter, and latency measurement is streamed directly into BigQuery for compliance auditing.
+                  </span>
+                </div>
+                <div class="d-flex gap-2">
+                  <button type="button" class="btn btn-sm btn-outline-primary fw-semibold" onclick="loadRecentTraces()">
+                    <i class="fa-solid fa-arrows-rotate me-1"></i> Refresh BigQuery Traces
+                  </button>
+                </div>
+              </div>
+
+              <!-- Traces Table -->
+              <div class="table-responsive rounded border bg-white" style="max-height: 260px; overflow-y: auto;">
+                <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.76rem;">
+                  <thead class="table-light sticky-top">
+                    <tr>
+                      <th scope="col" style="min-width: 130px;">Timestamp (UTC)</th>
+                      <th scope="col" style="min-width: 100px;">Trace ID</th>
+                      <th scope="col" style="min-width: 160px;">Agent</th>
+                      <th scope="col" style="min-width: 150px;">Event Type</th>
+                      <th scope="col" style="min-width: 90px;">Status</th>
+                      <th scope="col" style="min-width: 80px;">Latency</th>
+                      <th scope="col">Decision Details Payload</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bqTracesTableBody">
+                    <tr>
+                      <td colspan="7" class="text-center text-muted py-3">
+                        <i class="fa-solid fa-spinner fa-spin me-1"></i> Loading BigQuery execution traces...
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- EXTRA CREDIT: SINGLE NETWORK FIX SIMULATOR -->
+    <!-- ========================================== -->
+    <div id="trackPane4" class="track-pane row mt-2">
+      <div class="col-12">
+        <div class="card p-4 shadow-sm" style="border: 1px solid #bae6fd; border-radius: 1.25rem; background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);">
+          <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+            <div>
+              <span class="badge rounded-pill mb-1 fw-bold" style="background:#fef9c3; color:#854d0e; border:1px solid #fef08a;"><i class="fa-solid fa-award me-1 text-warning"></i>Extra Credit: Challenge Requirement</span>
+              <h5 class="card-title mb-1 fw-bold text-dark"><i class="fa-solid fa-seedling text-success me-2"></i>Extra Credit Simulator: Single Network Fix (Paper Fax &rarr; Electronic EHR Intake + Bilingual Pre-Check)</h5>
+              <p class="text-muted small mb-0">
+                Compute exactly how many breached toddler referral cases drop under the 45-day statutory limit when a regional Part C coordinator switches to electronic intake with pre-checked bilingual evaluator slots.
+              </p>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <select id="simCoordSelect" class="form-select form-select-sm" style="width: auto; border-radius: 0.75rem;">
+                <option value="SYN-PROV-NY-011" selected>Walton Regional Desk (SYN-PROV-NY-011)</option>
+                <option value="SYN-PROV-NY-012">Bronx Regional Desk (SYN-PROV-NY-012)</option>
+                <option value="SYN-PROV-NY-009">Canton Regional Desk (SYN-PROV-NY-009)</option>
+                <option value="SYN-PROV-NY-010">Malone Regional Desk (SYN-PROV-NY-010)</option>
+              </select>
+              <button class="btn btn-primary btn-sm fw-bold px-3" onclick="runNetworkSimulation()" style="background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%); border: none; border-radius: 0.75rem;">Run Graph Simulation</button>
+            </div>
+          </div>
+
+          <div id="simResultsArea" class="p-3 rounded-4 border" style="background:#fefce8; border-color:#fef08a !important;">
+            <!-- Executive Summary Alert Banner -->
+            <div class="alert d-flex align-items-center mb-3 p-3 rounded-4" style="background:linear-gradient(135deg, #dcfce7 0%, #ecfdf5 100%); border:1px solid #86efac; color:#14532d;">
+              <div class="fs-2 me-3">🌱</div>
+              <div>
+                <h6 class="alert-heading mb-1 fw-bold"><i class="fa-solid fa-shield-heart me-1 text-success"></i>Network Fix Simulation Summary: Walton Regional Intake Desk (SYN-PROV-NY-011)</h6>
+                <div id="simExecutiveSummary" class="small mb-0">
+                  Switching <strong>Walton Regional Part C Intake Desk (SYN-PROV-NY-011)</strong> from <code>paper_fax</code> to <strong>electronic EHR intake</strong> with <strong>pre-checked bilingual evaluator slots</strong> rescues <strong>6 of 7 breached referral chains (85.7%)</strong> directly under the 45-day federal IFSP statutory limit. Average referral latency drops from <strong>74.3 days down to 36.3 days</strong>, slashing <strong>246 delayed child-days</strong> and decreasing statewide breaches by <strong>23.1% (from 26 down to 20)</strong>.
+                </div>
+              </div>
+            </div>
+
+            <div class="row g-3 text-center mb-3">
+              <div class="col-md-3">
+                <div class="p-3 bg-white shadow-xs" style="border: 1px solid #fecdd3; border-top: 4px solid #fb7185 !important; border-radius: 1rem;">
+                  <div class="text-muted small text-uppercase fw-semibold">Coordinator Breaches</div>
+                  <div id="simStatOrig" class="fw-bold text-danger fs-4 mt-1">7 Cases (&gt;45d)</div>
+                  <div class="small text-muted">Baseline Fax Latency ~74.3d</div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="p-3 bg-white shadow-xs" style="border: 1px solid #bbf7d0; border-top: 4px solid #10b981 !important; border-radius: 1rem;">
+                  <div class="text-muted small text-uppercase fw-semibold">Cases Dropped &le;45d</div>
+                  <div id="simStatRescued" class="fw-bold text-success fs-4 mt-1">6 Rescued (&le;45d)</div>
+                  <div class="small text-success fw-bold">85.7% Hub Recovery Rate</div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="p-3 bg-white shadow-xs" style="border: 1px solid #bae6fd; border-top: 4px solid #0284c7 !important; border-radius: 1rem;">
+                  <div class="text-muted small text-uppercase fw-semibold">Statewide Impact</div>
+                  <div id="simStatState" class="fw-bold text-primary fs-4 mt-1">26 &rarr; 20 (-23.1%)</div>
+                  <div class="small text-muted">Across 44 Multi-Hop Chains</div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="p-3 bg-white shadow-xs" style="border: 1px solid #bbf7d0; border-top: 4px solid #059669 !important; border-radius: 1rem;">
+                  <div class="text-muted small text-uppercase fw-semibold">Delayed Child-Days Saved</div>
+                  <div id="simStatDays" class="fw-bold text-success fs-4 mt-1">246 Child-Days</div>
+                  <div class="small text-muted">Slashing Wait from 74.3d to 36.3d</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mechanism Explanation -->
+            <div class="card p-3 mb-3 border-0 bg-white shadow-sm" style="border-radius: 1rem;">
+              <h6 class="fw-bold mb-2 text-dark">🔍 Counterfactual Mechanism: How One Fix Solves Breaches</h6>
+              <div class="small text-muted">
+                <ol class="mb-0 ps-3">
+                  <li><strong>Hop 1 Channel Upgrade:</strong> Upgrades the initial clinic handoff from slow paper fax (14 days) to direct EHR push (~6-7 days), reclaiming a week upfront.</li>
+                  <li><strong>Bilingual Pre-Check Elimination:</strong> The coordinator no longer bounces the referral into a monolingual evaluation center (which triggered an extra 31–38 day handoff loop). The child is routed directly to a verified bilingual evaluator.</li>
+                  <li><strong>36-Month Cliff Protection:</strong> Prevents older toddlers (28–32 months) from irreversibly aging out of Part C coverage during administrative ping-pong handoffs.</li>
+                </ol>
+              </div>
+            </div>
+
+            <!-- Hub Comparison Table -->
+            <h6 class="fw-bold mb-2">📋 Comparative Simulation Across Regional Intake Coordinators</h6>
+            <div class="table-responsive">
+              <table class="table table-sm table-hover align-middle mb-2 bg-white">
+                <thead class="table-light">
+                  <tr>
+                    <th>Coordinator Desk</th>
+                    <th>Breached Chains</th>
+                    <th>Rescued (&le;45d)</th>
+                    <th>Residual Breaches</th>
+                    <th>Child-Days Saved</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="simRankingTbody">
+                  <tr class="table-primary">
+                    <td><strong>Walton Regional Part C Intake Desk (SYN-PROV-NY-011)</strong></td>
+                    <td><span class="badge bg-danger">7 cases</span></td>
+                    <td><span class="badge bg-success">6 cases dropped &le;45d</span></td>
+                    <td>1 residual case</td>
+                    <td><span class="text-success fw-bold">246 days</span></td>
+                    <td><span class="badge bg-primary">Active Target</span></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Bronx Regional Part C Intake Desk (SYN-PROV-NY-012)</strong></td>
+                    <td><span class="badge bg-danger">7 cases</span></td>
+                    <td><span class="badge bg-success">6 cases dropped &le;45d</span></td>
+                    <td>1 residual case</td>
+                    <td><span class="text-success fw-bold">246 days</span></td>
+                    <td><button class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="simulateHub('SYN-PROV-NY-012')">Simulate</button></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Canton Regional Part C Intake Desk (SYN-PROV-NY-009)</strong></td>
+                    <td><span class="badge bg-danger">6 cases</span></td>
+                    <td><span class="badge bg-success">6 cases dropped &le;45d</span></td>
+                    <td>0 residual cases</td>
+                    <td><span class="text-success fw-bold">208 days</span></td>
+                    <td><button class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="simulateHub('SYN-PROV-NY-009')">Simulate</button></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Malone Regional Part C Intake Desk (SYN-PROV-NY-010)</strong></td>
+                    <td><span class="badge bg-danger">6 cases</span></td>
+                    <td><span class="badge bg-success">5 cases dropped &le;45d</span></td>
+                    <td>1 residual case</td>
+                    <td><span class="text-success fw-bold">208 days</span></td>
+                    <td><button class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="simulateHub('SYN-PROV-NY-010')">Simulate</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div id="simSummaryText" class="small text-muted mt-2">
+              <strong>Outcome:</strong> Switching coordinator Walton Regional Part C Intake &amp; Service Coordination Desk #11 (SYN-PROV-NY-011) to electronic intake with pre-checked bilingual slots immediately rescues 6 of its 7 breached chains under the 45-day federal IFSP statutory limit, saving 246 total delayed child-days.
             </div>
           </div>
         </div>
@@ -830,144 +1318,6 @@ I partner with you to ensure every infant and toddler reaches their developmenta
         </div>
       </div>
     </div>
-
-    <!-- Interactive Single Network Fix Simulator (Challenge Requirement) -->
-    <div id="trackPane4" class="track-pane row mt-2">
-      <div class="col-12">
-        <div class="card p-4" style="border: 2px solid #bae6fd; background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);">
-          <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-            <div>
-              <span class="badge rounded-pill mb-1 fw-bold" style="background:#dcfce7; color:#15803d;"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>Graph Counterfactual Intervention</span>
-              <h5 class="card-title mb-1 fw-bold text-dark"><i class="fa-solid fa-seedling text-success me-2"></i>Simulate Single Network Fix: Paper Fax &rarr; Electronic EHR Intake + Bilingual Pre-Check</h5>
-              <p class="text-muted small mb-0">
-                Compute exactly how many breached toddler referral cases drop under the 45-day statutory limit when a regional Part C coordinator switches to electronic intake with pre-checked bilingual evaluator slots.
-              </p>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-              <select id="simCoordSelect" class="form-select form-select-sm" style="width: auto;">
-                <option value="SYN-PROV-NY-011" selected>Walton Regional Desk (SYN-PROV-NY-011)</option>
-                <option value="SYN-PROV-NY-012">Bronx Regional Desk (SYN-PROV-NY-012)</option>
-                <option value="SYN-PROV-NY-009">Canton Regional Desk (SYN-PROV-NY-009)</option>
-                <option value="SYN-PROV-NY-010">Malone Regional Desk (SYN-PROV-NY-010)</option>
-              </select>
-              <button class="btn btn-primary btn-sm" onclick="runNetworkSimulation()">Run Graph Simulation</button>
-            </div>
-          </div>
-
-          <div id="simResultsArea" class="p-3 rounded-4 border" style="background:#fefce8; border-color:#fef08a !important;">
-            <!-- Executive Summary Alert Banner -->
-            <div class="alert d-flex align-items-center mb-3 p-3 rounded-3" style="background:linear-gradient(135deg, #dcfce7 0%, #ecfdf5 100%); border:1px solid #86efac; color:#14532d;">
-              <div class="fs-2 me-3">🌱</div>
-              <div>
-                <h6 class="alert-heading mb-1 fw-bold"><i class="fa-solid fa-shield-heart me-1 text-success"></i>Network Fix Simulation Summary: Indianola Regional Intake Desk (SYN-PROV-MS-011)</h6>
-                <div id="simExecutiveSummary" class="small mb-0">
-                  Switching <strong>Indianola Regional Part C Intake Desk</strong> from <code>paper_fax</code> to <strong>electronic EHR intake</strong> with <strong>pre-checked bilingual evaluator slots</strong> rescues <strong>6 of 7 breached referral chains (85.7%)</strong> directly under the 45-day federal IFSP statutory limit. Average referral latency drops from <strong>74.3 days down to 36.3 days</strong>, slashing <strong>246 delayed child-days</strong> and decreasing statewide breaches by <strong>23.1% (from 26 down to 20)</strong>.
-                </div>
-              </div>
-            </div>
-
-            <div class="row g-3 text-center mb-3">
-              <div class="col-md-3">
-                <div class="p-3 bg-white rounded-3 border shadow-sm" style="border-top: 3px solid #fb7185 !important;">
-                  <div class="text-muted small text-uppercase fw-semibold">Coordinator Breaches</div>
-                  <div id="simStatOrig" class="fw-bold text-danger fs-4 mt-1">7 Cases (&gt;45d)</div>
-                  <div class="small text-muted">Baseline Fax Latency ~74.3d</div>
-                </div>
-              </div>
-              <div class="col-md-3">
-                <div class="p-3 bg-white rounded-3 border shadow-sm" style="border-top: 3px solid #10b981 !important;">
-                  <div class="text-muted small text-uppercase fw-semibold">Cases Dropped &le;45d</div>
-                  <div id="simStatRescued" class="fw-bold text-success fs-4 mt-1">6 Rescued (&le;45d)</div>
-                  <div class="small text-success fw-bold">85.7% Hub Recovery Rate</div>
-                </div>
-              </div>
-              <div class="col-md-3">
-                <div class="p-3 bg-white rounded-3 border shadow-sm" style="border-top: 3px solid #0284c7 !important;">
-                  <div class="text-muted small text-uppercase fw-semibold">Statewide Impact</div>
-                  <div id="simStatState" class="fw-bold text-primary fs-4 mt-1">26 &rarr; 20 (-23.1%)</div>
-                  <div class="small text-muted">Across 44 Multi-Hop Chains</div>
-                </div>
-              </div>
-              <div class="col-md-3">
-                <div class="p-3 bg-white rounded-3 border shadow-sm" style="border-top: 3px solid #059669 !important;">
-                  <div class="text-muted small text-uppercase fw-semibold">Delayed Child-Days Saved</div>
-                  <div id="simStatDays" class="fw-bold text-success fs-4 mt-1">246 Child-Days</div>
-                  <div class="small text-muted">Slashing Wait from 74.3d to 36.3d</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Mechanism Explanation -->
-            <div class="card p-3 mb-3 border-0 bg-white shadow-sm">
-              <h6 class="fw-bold mb-2 text-dark">🔍 Counterfactual Mechanism: How One Fix Solves Breaches</h6>
-              <div class="small text-muted">
-                <ol class="mb-0 ps-3">
-                  <li><strong>Hop 1 Channel Upgrade:</strong> Upgrades the initial clinic handoff from slow paper fax (14 days) to direct EHR push (~6-7 days), reclaiming a week upfront.</li>
-                  <li><strong>Bilingual Pre-Check Elimination:</strong> The coordinator no longer bounces the referral into a monolingual evaluation center (which triggered an extra 31–38 day handoff loop). The child is routed directly to a verified bilingual evaluator.</li>
-                  <li><strong>36-Month Cliff Protection:</strong> Prevents older toddlers (28–32 months) from irreversibly aging out of Part C coverage during administrative ping-pong handoffs.</li>
-                </ol>
-              </div>
-            </div>
-
-            <!-- Hub Comparison Table -->
-            <h6 class="fw-bold mb-2">📋 Comparative Simulation Across Regional Intake Coordinators</h6>
-            <div class="table-responsive">
-              <table class="table table-sm table-hover align-middle mb-2 bg-white">
-                <thead class="table-light">
-                  <tr>
-                    <th>Coordinator Desk</th>
-                    <th>Breached Chains</th>
-                    <th>Rescued (&le;45d)</th>
-                    <th>Residual Breaches</th>
-                    <th>Child-Days Saved</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody id="simRankingTbody">
-                  <tr>
-                    <td><strong>Jackson Regional Intake Desk (SYN-PROV-MS-012)</strong></td>
-                    <td><span class="badge bg-danger">7 cases</span></td>
-                    <td><span class="badge bg-success">7 cases dropped &le;45d</span></td>
-                    <td>0 residual cases</td>
-                    <td><span class="text-success fw-bold">246 days</span></td>
-                    <td><button class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="simulateHub('SYN-PROV-MS-012')">Simulate</button></td>
-                  </tr>
-                  <tr class="table-primary">
-                    <td><strong>Indianola Regional Intake Desk (SYN-PROV-MS-011)</strong></td>
-                    <td><span class="badge bg-danger">7 cases</span></td>
-                    <td><span class="badge bg-success">6 cases dropped &le;45d</span></td>
-                    <td>1 residual case</td>
-                    <td><span class="text-success fw-bold">246 days</span></td>
-                    <td><span class="badge bg-primary">Active Target</span></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Greenville Regional Intake Desk (SYN-PROV-MS-010)</strong></td>
-                    <td><span class="badge bg-danger">6 cases</span></td>
-                    <td><span class="badge bg-success">6 cases dropped &le;45d</span></td>
-                    <td>0 residual cases</td>
-                    <td><span class="text-success fw-bold">208 days</span></td>
-                    <td><button class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="simulateHub('SYN-PROV-MS-010')">Simulate</button></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Cleveland Regional Intake Desk (SYN-PROV-MS-009)</strong></td>
-                    <td><span class="badge bg-danger">6 cases</span></td>
-                    <td><span class="badge bg-success">4 cases dropped &le;45d</span></td>
-                    <td>2 residual cases</td>
-                    <td><span class="text-success fw-bold">208 days</span></td>
-                    <td><button class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="simulateHub('SYN-PROV-MS-009')">Simulate</button></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div id="simSummaryText" class="small text-muted mt-2">
-              <strong>Outcome:</strong> Switching coordinator Indianola Regional Part C Intake &amp; Service Coordination Desk #11 (SYN-PROV-MS-011) to electronic intake with pre-checked bilingual slots immediately rescues 6 of its 7 breached chains under the 45-day federal IFSP statutory limit, saving 246 total delayed child-days.
-            </div>
-          </div>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- Modal: Bilingual Caregiver Action Note -->
@@ -1137,18 +1487,18 @@ I partner with you to ensure every infant and toddler reaches their developmenta
         input.value = `Where should community developmental screening outreach days go first in ${cfg.name}?`;
         loadEquityAuditData();
       } else if (trackNum === 4) {
-        info.innerHTML = "<strong>Track 4 Active:</strong> Graph Simulation — Compute how many breached cases drop &le;45d when converting one paper-fax coordinator to electronic intake + bilingual pre-checking.";
-        input.value = "Simulate network fix: how many breached cases drop under 45 days if Indianola intake coordinator switches to electronic intake with pre-checked bilingual slots?";
+        info.innerHTML = "<strong>Extra Credit Active:</strong> Graph Simulation — Compute how many breached cases drop &le;45d when converting one paper-fax coordinator to electronic intake + bilingual pre-checking.";
+        input.value = "Simulate network fix: how many breached cases drop under 45 days if Walton Regional Desk (SYN-PROV-NY-011) switches to electronic intake with pre-checked bilingual slots?";
         const simEl = document.getElementById('simResultsArea');
         if (simEl) simEl.scrollIntoView({ behavior: 'smooth' });
       }
     }
 
-    // Load SVG referral comparison graph on page ready (defaults to NY)
     window.addEventListener('DOMContentLoaded', () => {
       setActiveState('NY');
       // Initialize Track 1 location resolution and triage route
       resolveLocationNow();
+      loadRecentTraces();
     });
 
     let svgCurrentMode = "both";
@@ -1490,11 +1840,191 @@ I partner with you to ensure every infant and toddler reaches their developmenta
 
           // Run pathway triage automatically
           runTriage();
+        } else {
+          // Explicit error handling for out-of-state ZIP / Tract / City or unrecognized location
+          const errCode = data.error_code || 'LOCATION_ERROR';
+          badge.className = 'badge bg-danger';
+          badge.innerText = errCode === 'OUT_OF_STATE_ZIP' ? 'Outside NY State' :
+                            errCode === 'OUT_OF_STATE_TRACT' ? 'Non-NY Census Tract' :
+                            errCode === 'OUT_OF_STATE_CITY' ? 'Outside NY State' : 'Not Found in NY';
+
+          document.getElementById('geoResolvedText').innerHTML =
+            `<div class="alert alert-danger p-2 mb-0 mt-1 small">
+              <i class="fa-solid fa-triangle-exclamation me-1"></i>
+              <strong>Out of Jurisdiction:</strong> ${data.message || 'Location could not be verified in New York State.'}
+            </div>`;
+
+          const listDiv = document.getElementById('closestClinicsList');
+          if (listDiv) {
+            listDiv.innerHTML = `
+              <div class="p-2 text-danger small">
+                <i class="fa-solid fa-ban me-1"></i>
+                <strong>No NY screening clinics:</strong> Location is outside New York IDEA Part C jurisdiction (FIPS 36).
+              </div>
+            `;
+          }
+
+          const triageRes = document.getElementById('triageResult');
+          if (triageRes) {
+            triageRes.innerHTML = `
+              <div class="alert alert-warning p-3 small mb-0">
+                <h6 class="alert-heading fw-bold mb-1"><i class="fa-solid fa-shield-halved text-warning me-1"></i>Routing Suspended: Out-of-State Jurisdiction</h6>
+                <div>${data.message || 'Entered location is outside New York State.'}</div>
+                <div class="mt-2 text-muted">Please enter a valid 5-digit New York ZIP code (10001–14925), New York city/borough, or an 11-digit NY Census Tract GEOID (beginning with 36).</div>
+              </div>
+            `;
+          }
+
+          const graphCard = document.getElementById('triageGraphCard');
+          if (graphCard) graphCard.style.display = 'none';
         }
       } catch (err) {
         badge.className = 'badge bg-danger';
         badge.innerText = 'Resolve Error';
         console.warn('Geo resolve failed:', err);
+      }
+    }
+
+    const UI_TRANSLATIONS = {
+      en: {
+        triageTitle: '<i class="fa-solid fa-compass text-primary me-2"></i>Today\'s Referral Navigator',
+        statutoryClock: 'Statutory Clock: 45 Days',
+        description: 'Enter the child\'s natural geographic location (ZIP Code, City, or Census Tract GEOID) to resolve nearest screening centers and calculate a guaranteed &le;45d IDEA Part C pathway.',
+        geoLabel: '<i class="fa-solid fa-map-location-dot text-danger me-1"></i>Location (ZIP, City, or Census GEOID)',
+        geoPlaceholder: 'e.g. 10451, Bronx, Jamestown, Lockport, or 36005019700',
+        quickSelect: 'Quick Select:',
+        tractLabel: 'Census Tract GEOID',
+        closestTitle: '🏥 Nearest Screening Centers',
+        closestSubtitle: 'Live Spatial Radius',
+        childAgeLabel: 'Child Age (Months)',
+        childAgeHelp: 'Part C Cliff: 36 Months (Urgent alert triggers at 30+ months)',
+        reqMedicaid: 'Requires Medicaid Acceptance',
+        reqBilingual: 'Requires Bilingual Evaluator (Spanish)',
+        bilingualActive: '<i class="fa-solid fa-language me-1"></i>Bilingual Spanish Mandate Active',
+        bilingualInactive: '<i class="fa-solid fa-globe me-1"></i>Standard Monolingual / English Capacity',
+        bilingualNoticeActive: 'Locks pathway to verified bilingual evaluation hubs (Lockport NY-019). Toggle off to allow standard English/monolingual hubs.',
+        bilingualNoticeInactive: 'Allows standard regional evaluation hubs without Spanish specialization requirement.',
+        btnCalculate: '<i class="fa-solid fa-route me-1"></i> Calculate Compliant Pathway (&le; 45d)',
+        resultPrompt: 'Click above or toggle any switch to calculate optimal graph routing.',
+        chatWelcome: `👋 <strong>Hello Coordinator! I am Maya, your Milestone Navigator.</strong><br><br>I partner with you to ensure every infant and toddler reaches their developmental evaluation well within the federal 45-day statutory IFSP clock.<br><br><strong>How can I assist today's casework?</strong><br>• <strong>Natural Location Triage:</strong> <em>"Route a 22-month-old Spanish-speaking Medicaid toddler living in ZIP 10451."</em><br>• <strong>Age Cliff Escalation:</strong> <em>"We just received a 32-month-old referral in Canton. What is the emergency fast-track sequence before they age out at 36 months?"</em><br>• <strong>Caregiver Action Notes:</strong> <em>"Draft bilingual English and Spanish family action notes for the Rivera family and toddler Mateo."</em><br>• <strong>Pre-Handoff Quality Audit:</strong> <em>"Check if referral packet for 22m Spanish toddler to coordinator SYN-PROV-NY-011 will bounce."</em><br>• <strong>Transit Check:</strong> <em>"Does Bronx tract 36005019700 trigger the zero-vehicle transit guardrail?"</em>`,
+        chatPlaceholder: 'Ask Maya (e.g. Find a pathway for a 20-month-old in ZIP 10451 on Medicaid)...',
+        btnSend: '<i class="fa-solid fa-paper-plane me-1"></i> Send',
+        chatPromptsLabel: '<i class="fa-solid fa-bolt text-warning me-1"></i>Casework Prompts:'
+      },
+      es: {
+        triageTitle: '<i class="fa-solid fa-compass text-primary me-2"></i>Navegador de Derivaciones de Hoy',
+        statutoryClock: 'Reloj Legal: 45 Días',
+        description: 'Ingrese la ubicación geográfica del menor (Código Postal, Ciudad o GEOID de Tracto Censal) para ubicar los centros de detección más cercanos y calcular una ruta garantizada de &le;45 días de IDEA Parte C.',
+        geoLabel: '<i class="fa-solid fa-map-location-dot text-danger me-1"></i>Ubicación (Código Postal, Ciudad o GEOID)',
+        geoPlaceholder: 'ej. 10451, El Bronx, Jamestown, Lockport o 36005019700',
+        quickSelect: 'Selección Rápida:',
+        tractLabel: 'GEOID de Tracto Censal (11 dígitos)',
+        closestTitle: '🏥 Centros de Detección Más Cercanos',
+        closestSubtitle: 'Radio Espacial en Vivo',
+        childAgeLabel: 'Edad del Menor (Meses)',
+        childAgeHelp: 'Límite Parte C: 36 Meses (Alerta urgente para 30+ meses)',
+        reqMedicaid: 'Requiere Aceptación de Medicaid',
+        reqBilingual: 'Requiere Evaluador Bilingüe (Español)',
+        bilingualActive: '<i class="fa-solid fa-language me-1"></i>Mandato Bilingüe en Español Activo',
+        bilingualInactive: '<i class="fa-solid fa-globe me-1"></i>Capacidad Estándar en Inglés / Monolingüe',
+        bilingualNoticeActive: 'Restringe la ruta a centros de evaluación bilingües certificados (Lockport NY-019). Desactive para permitir centros generales en inglés.',
+        bilingualNoticeInactive: 'Permite centros de evaluación regionales estándar sin requisito de español.',
+        btnCalculate: '<i class="fa-solid fa-route me-1"></i> Calcular Ruta Conforme (&le; 45d)',
+        resultPrompt: 'Haga clic arriba o active cualquier opción para calcular el enrutamiento óptimo.',
+        chatWelcome: `👋 <strong>¡Hola Coordinador(a)! Soy Maya, su Navegadora de Hitos del Desarrollo.</strong><br><br>Colaboro con usted para garantizar que cada lactante y niño pequeño complete su evaluación del desarrollo dentro del plazo legal federal de 45 días para el IFSP (34 CFR § 303.310).<br><br><strong>¿Cómo puedo asistirle en los casos de hoy?</strong><br>• <strong>Enrutamiento Geográfico:</strong> <em>"Ruta para un niño de 22 meses que habla español con Medicaid en el código postal 10451."</em><br>• <strong>Urgencia Límite de 36 Meses:</strong> <em>"Recibimos una derivación de 32 meses en Canton. ¿Cuál es la ruta de emergencia antes de que cumpla 36 meses?"</em><br>• <strong>Notas Bilingües para la Familia:</strong> <em>"Redactar nota bilingüe en inglés y español para la familia Rivera y el niño Mateo."</em><br>• <strong>Auditoría Pre-Derivación:</strong> <em>"Verificar si el paquete para el coordinador SYN-PROV-NY-011 será rechazado por fax."</em><br>• <strong>Tránsito y SDOH:</strong> <em>"¿El tracto 36005019700 del Bronx activa la regla de transporte sin vehículo?"</em>`,
+        chatPlaceholder: 'Pregunte a Maya (ej. Buscar una ruta para un niño de 22 meses en CP 10451 con Medicaid)...',
+        btnSend: '<i class="fa-solid fa-paper-plane me-1"></i> Enviar',
+        chatPromptsLabel: '<i class="fa-solid fa-bolt text-warning me-1"></i>Consultas Rápidas:'
+      }
+    };
+
+    let currentInterfaceLang = 'en';
+    let currentGraphLang = 'en';
+
+    function setInterfaceLanguage(lang) {
+      currentInterfaceLang = lang;
+      currentGraphLang = lang;
+
+      const btnEn = document.getElementById('btnLangEn');
+      const btnEs = document.getElementById('btnLangEs');
+      if (btnEn) btnEn.className = lang === 'en' ? 'btn btn-xs btn-primary active py-0 px-2 fw-semibold' : 'btn btn-xs btn-outline-primary py-0 px-2 fw-semibold';
+      if (btnEs) btnEs.className = lang === 'es' ? 'btn btn-xs btn-primary active py-0 px-2 fw-semibold' : 'btn btn-xs btn-outline-primary py-0 px-2 fw-semibold';
+
+      // Update Graph Lang buttons too
+      const btnGEn = document.getElementById('btnGraphLangEn');
+      const btnGEs = document.getElementById('btnGraphLangEs');
+      if (btnGEn) btnGEn.className = lang === 'en' ? 'btn btn-xs btn-primary active py-0 px-2 fw-bold' : 'btn btn-xs btn-outline-secondary py-0 px-2 fw-bold';
+      if (btnGEs) btnGEs.className = lang === 'es' ? 'btn btn-xs btn-primary active py-0 px-2 fw-bold' : 'btn btn-xs btn-outline-secondary py-0 px-2 fw-bold';
+
+      const t = UI_TRANSLATIONS[lang] || UI_TRANSLATIONS.en;
+      if (document.getElementById('triageCardTitle')) document.getElementById('triageCardTitle').innerHTML = t.triageTitle;
+      if (document.getElementById('triageStatutoryClockBadge')) document.getElementById('triageStatutoryClockBadge').innerText = t.statutoryClock;
+      if (document.getElementById('triageDescriptionText')) document.getElementById('triageDescriptionText').innerHTML = t.description;
+      if (document.getElementById('geoInputLabel')) document.getElementById('geoInputLabel').innerHTML = t.geoLabel;
+      if (document.getElementById('geoInput')) document.getElementById('geoInput').placeholder = t.geoPlaceholder;
+      if (document.getElementById('quickSelectLabel')) document.getElementById('quickSelectLabel').innerText = t.quickSelect;
+      if (document.getElementById('tractGeoidLabel')) document.getElementById('tractGeoidLabel').innerText = t.tractLabel;
+      if (document.getElementById('closestClinicsTitle')) document.getElementById('closestClinicsTitle').innerText = t.closestTitle;
+      if (document.getElementById('closestClinicsSubtitle')) document.getElementById('closestClinicsSubtitle').innerText = t.closestSubtitle;
+      if (document.getElementById('childAgeLabel')) document.getElementById('childAgeLabel').innerText = t.childAgeLabel;
+      if (document.getElementById('childAgeHelp')) document.getElementById('childAgeHelp').innerText = t.childAgeHelp;
+      if (document.getElementById('reqMedicaidLabel')) document.getElementById('reqMedicaidLabel').innerText = t.reqMedicaid;
+      if (document.getElementById('reqBilingualLabel')) document.getElementById('reqBilingualLabel').innerText = t.reqBilingual;
+      if (document.getElementById('btnCalculatePathway')) document.getElementById('btnCalculatePathway').innerHTML = t.btnCalculate;
+      if (document.getElementById('userInput')) document.getElementById('userInput').placeholder = t.chatPlaceholder;
+      if (document.getElementById('btnSendMessage')) document.getElementById('btnSendMessage').innerHTML = t.btnSend;
+      if (document.getElementById('chatPromptsLabel')) document.getElementById('chatPromptsLabel').innerHTML = t.chatPromptsLabel;
+
+      const reqBi = document.getElementById('reqBilingual') ? document.getElementById('reqBilingual').checked : true;
+      const badge = document.getElementById('bilingualBadge');
+      const notice = document.getElementById('bilingualNoticeText');
+      if (badge) badge.innerHTML = reqBi ? t.bilingualActive : t.bilingualInactive;
+      if (notice) notice.innerText = reqBi ? t.bilingualNoticeActive : t.bilingualNoticeInactive;
+
+      // Update welcome message if chat hasn't had messages
+      const chatBox = document.getElementById('chatBox');
+      const welcome = document.getElementById('chatWelcomeMsg');
+      if (welcome && chatBox && chatBox.children.length === 1) {
+        welcome.innerHTML = t.chatWelcome;
+      }
+
+      // Re-render pathway graph if child pathway is loaded
+      if (window.currentTriagePathway) {
+        renderPathwayGraph(window.currentTriagePathway);
+      }
+    }
+
+    function setGraphLanguage(lang) {
+      currentGraphLang = lang;
+      const btnEn = document.getElementById('btnGraphLangEn');
+      const btnEs = document.getElementById('btnGraphLangEs');
+      if (btnEn) btnEn.className = lang === 'en' ? 'btn btn-xs btn-primary active py-0 px-2 fw-bold' : 'btn btn-xs btn-outline-secondary py-0 px-2 fw-bold';
+      if (btnEs) btnEs.className = lang === 'es' ? 'btn btn-xs btn-primary active py-0 px-2 fw-bold' : 'btn btn-xs btn-outline-secondary py-0 px-2 fw-bold';
+      if (window.currentTriagePathway) {
+        renderPathwayGraph(window.currentTriagePathway);
+      }
+    }
+
+    function handleBilingualToggle() {
+      const reqBi = document.getElementById('reqBilingual').checked;
+      const t = UI_TRANSLATIONS[currentInterfaceLang] || UI_TRANSLATIONS.en;
+      const badge = document.getElementById('bilingualBadge');
+      const notice = document.getElementById('bilingualNoticeText');
+      if (reqBi) {
+        if (badge) { badge.innerHTML = t.bilingualActive; badge.style.background = '#7c3aed'; }
+        if (notice) notice.innerText = t.bilingualNoticeActive;
+      } else {
+        if (badge) { badge.innerHTML = t.bilingualInactive; badge.style.background = '#64748b'; }
+        if (notice) notice.innerText = t.bilingualNoticeInactive;
+      }
+      runTriage();
+    }
+
+    function insertPrompt(text) {
+      const el = document.getElementById('userInput');
+      if (el) {
+        el.value = text;
+        el.focus();
       }
     }
 
@@ -1505,12 +2035,28 @@ I partner with you to ensure every infant and toddler reaches their developmenta
 
       card.style.display = 'block';
 
+      const isEs = currentGraphLang === 'es';
+
+      // Update card title and map button in graph header
+      const graphTitle = document.getElementById('triageGraphTitle');
+      if (graphTitle) {
+        graphTitle.innerHTML = isEs
+          ? '<i class="fa-solid fa-diagram-project text-info me-1"></i> Gráfico de Transición del Plan de Derivación (Este Menor)'
+          : '<i class="fa-solid fa-diagram-project text-info me-1"></i> Pathway Handoff Graph (This Toddler)';
+      }
+      const btnMap = document.getElementById('btnGraphViewMap');
+      if (btnMap) {
+        btnMap.innerHTML = isEs
+          ? '<i class="fa-solid fa-location-crosshairs me-1"></i> Ver en el Mapa'
+          : '<i class="fa-solid fa-location-crosshairs me-1"></i> View on Map';
+      }
+
       // 4 stages: Screening Clinic -> Coordinator -> Eval Hub -> Vendor
       const nodes = [
-        { label: "Screening Clinic", name: p.screening_clinic.replace(' [Synthetic]', ''), days: p.clinic_wait, x: 80, y: 55, color: "#38bdf8" },
-        { label: "Part C Coordinator", name: p.intake_coordinator.replace(' [Synthetic]', ''), days: p.coord_wait, x: 260, y: 55, color: "#fbbf24" },
-        { label: "Multidisc. Eval Hub", name: p.eval_hub.replace(' [Synthetic]', ''), days: p.eval_wait, x: 440, y: 55, color: p.eval_bilingual ? "#a855f7" : "#3b82f6" },
-        { label: "Direct Therapy Vendor", name: p.therapy_vendor.replace(' [Synthetic]', ''), days: p.vendor_wait, x: 610, y: 55, color: "#10b981" }
+        { label: isEs ? "Clínica de Detección" : "Screening Clinic", name: p.screening_clinic.replace(' [Synthetic]', ''), days: p.clinic_wait, x: 80, y: 55, color: "#7dd3fc" },
+        { label: isEs ? "Coordinador Parte C" : "Part C Coordinator", name: p.intake_coordinator.replace(' [Synthetic]', ''), days: p.coord_wait, x: 260, y: 55, color: "#fde047" },
+        { label: isEs ? (p.eval_bilingual ? "Centro Eval. Bilingüe" : "Centro de Evaluación") : "Multidisc. Eval Hub", name: p.eval_hub.replace(' [Synthetic]', ''), days: p.eval_wait, x: 440, y: 55, color: p.eval_bilingual ? "#c084fc" : "#93c5fd" },
+        { label: isEs ? "Proveedor de Terapia" : "Direct Therapy Vendor", name: p.therapy_vendor.replace(' [Synthetic]', ''), days: p.vendor_wait, x: 610, y: 55, color: "#86efac" }
       ];
 
       let svgHtml = `
@@ -1526,10 +2072,11 @@ I partner with you to ensure every infant and toddler reaches their developmenta
         const u = nodes[i];
         const v = nodes[i + 1];
         const midX = (u.x + v.x) / 2;
+        const hopLabel = isEs ? `Salto EHR ${i+1}` : `EHR Hop ${i+1}`;
         svgHtml += `
-          <line x1="${u.x + 22}" y1="${u.y}" x2="${v.x - 22}" y2="${v.y}" stroke="#38bdf8" stroke-width="2.5" marker-end="url(#arrow-flow)" stroke-dasharray="${i === 1 ? 'none' : 'none'}"/>
-          <rect x="${midX - 28}" y="32" width="56" height="15" rx="3" fill="#1e293b" stroke="#38bdf8" stroke-width="0.8"/>
-          <text x="${midX}" y="43" fill="#38bdf8" font-size="8.5" font-family="monospace" text-anchor="middle" font-weight="bold">EHR Hop ${i+1}</text>
+          <line x1="${u.x + 22}" y1="${u.y}" x2="${v.x - 22}" y2="${v.y}" stroke="#38bdf8" stroke-width="2.5" marker-end="url(#arrow-flow)"/>
+          <rect x="${midX - 32}" y="32" width="64" height="15" rx="3" fill="#1e293b" stroke="#38bdf8" stroke-width="0.8"/>
+          <text x="${midX}" y="43" fill="#38bdf8" font-size="8.5" font-family="monospace" text-anchor="middle" font-weight="bold">${hopLabel}</text>
         `;
       }
 
@@ -1539,7 +2086,7 @@ I partner with you to ensure every infant and toddler reaches their developmenta
           <g>
             <circle cx="${n.x}" cy="${n.y}" r="18" fill="${n.color}" stroke="#ffffff" stroke-width="2.2" filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.4))"/>
             <text x="${n.x}" y="${n.y + 4}" fill="#0f172a" font-size="9" font-weight="900" text-anchor="middle">${idx + 1}</text>
-            <text x="${n.x}" y="${n.y + 32}" fill="#f8fafc" font-size="9" font-weight="bold" text-anchor="middle">${n.label}</text>
+            <text x="${n.x}" y="${n.y + 32}" fill="#f8fafc" font-size="8.5" font-weight="bold" text-anchor="middle">${n.label}</text>
             <text x="${n.x}" y="${n.y + 44}" fill="#94a3b8" font-size="7.5" text-anchor="middle">${n.name.substring(0, 18)}</text>
             <text x="${n.x}" y="${n.y - 25}" fill="#38bdf8" font-size="8.5" font-family="monospace" text-anchor="middle">+${n.days}d</text>
           </g>
@@ -1547,9 +2094,12 @@ I partner with you to ensure every infant and toddler reaches their developmenta
       });
 
       // Total clock summary tag in top right
+      const clockSummary = isEs
+        ? `❤️ Protección 45d: ${p.total_estimated_wait_days}d`
+        : `❤️ 45d Protected: ${p.total_estimated_wait_days}d (≤45d)`;
       svgHtml += `
-        <rect x="520" y="10" width="150" height="20" rx="4" fill="#047857" stroke="#10b981" stroke-width="1"/>
-        <text x="595" y="24" fill="#ffffff" font-size="9" font-weight="bold" text-anchor="middle">Total Pathway: ${p.total_estimated_wait_days}d (&le;45d)</text>
+        <rect x="490" y="8" width="180" height="22" rx="11" fill="#065f46" stroke="#34d399" stroke-width="1.5"/>
+        <text x="580" y="23" fill="#ecfdf5" font-size="8.8" font-weight="bold" text-anchor="middle">${clockSummary}</text>
       `;
 
       svg.innerHTML = svgHtml;
@@ -1596,24 +2146,25 @@ I partner with you to ensure every infant and toddler reaches their developmenta
             alertHtml += `<div class="alert alert-warning p-2 mb-2">🚐 <strong>${data.zero_vehicle_travel_guardrail.alert}</strong></div>`;
           }
           window.currentTriagePathway = p;
+          const isEs = currentInterfaceLang === 'es';
           resultDiv.innerHTML = `
             ${alertHtml}
             <div class="border rounded p-2 bg-light mb-2">
               <div class="d-flex justify-content-between align-items-center mb-1">
-                <span class="fw-bold text-success"><i class="fa-solid fa-circle-check me-1"></i>Compliant Pathway: ${p.total_estimated_wait_days} Total Days</span>
-                <span class="badge bg-success">&le; 45d Federal Clock</span>
+                <span class="fw-bold text-success"><i class="fa-solid fa-circle-check me-1"></i>${isEs ? `Ruta Conforme: ${p.total_estimated_wait_days} Días Totales` : `Compliant Pathway: ${p.total_estimated_wait_days} Total Days`}</span>
+                <span class="badge bg-success">&le; 45d ${isEs ? 'Reloj Federal' : 'Federal Clock'}</span>
               </div>
               <ol class="ps-3 mt-1 mb-2" style="font-size:0.8rem;">
-                <li><strong>Clinic:</strong> ${p.screening_clinic} (${p.clinic_wait}d)</li>
-                <li><strong>Coordinator:</strong> ${p.intake_coordinator} (${p.coord_wait}d)</li>
-                <li><strong>Eval Hub:</strong> ${p.eval_hub} (${p.eval_wait}d, Bilingual: ${p.eval_bilingual ? 'Yes' : 'No'})</li>
-                <li><strong>Therapy Vendor:</strong> ${p.therapy_vendor} (${p.vendor_wait}d)</li>
+                <li><strong>${isEs ? 'Clínica' : 'Clinic'}:</strong> ${p.screening_clinic} (${p.clinic_wait}d)</li>
+                <li><strong>${isEs ? 'Coordinador Parte C' : 'Coordinator'}:</strong> ${p.intake_coordinator} (${p.coord_wait}d)</li>
+                <li><strong>${isEs ? 'Centro de Evaluación' : 'Eval Hub'}:</strong> ${p.eval_hub} (${p.eval_wait}d, ${isEs ? 'Bilingüe' : 'Bilingual'}: ${p.eval_bilingual ? (isEs ? 'Sí' : 'Yes') : 'No'})</li>
+                <li><strong>${isEs ? 'Proveedor de Terapia' : 'Therapy Vendor'}:</strong> ${p.therapy_vendor} (${p.vendor_wait}d)</li>
               </ol>
               <div class="small text-muted mb-2">
-                <strong>Transit Proximity:</strong> ${p.total_travel_miles || '7.2'} total route miles
+                <strong>${isEs ? 'Proximidad de Tránsito' : 'Transit Proximity'}:</strong> ${p.total_travel_miles || '7.2'} ${isEs ? 'millas totales' : 'total route miles'}
               </div>
               <button type="button" class="btn btn-sm btn-outline-primary w-100 fw-bold" onclick="showCaregiverModal()">
-                <i class="fa-solid fa-file-signature me-1"></i> View / Print Bilingual Caregiver Action Note (EN/ES)
+                <i class="fa-solid fa-file-signature me-1"></i> ${isEs ? 'Ver / Imprimir Nota Bilingüe para la Familia (EN/ES)' : 'View / Print Bilingual Caregiver Action Note (EN/ES)'}
               </button>
             </div>
           `;
@@ -1628,8 +2179,190 @@ I partner with you to ensure every infant and toddler reaches their developmenta
             ${data.part_b_preschool_transition ? `<div class="alert alert-info p-2 mt-2"><strong>${data.part_b_preschool_transition.mandate}:</strong> ${data.part_b_preschool_transition.required_action}</div>` : ''}
           `;
         }
+
+        // Update Multi-Agent Execution Breakdown & Refresh BigQuery Traces
+        if (data.agent_breakdown) {
+          renderAgentExecutionBreakdown(data.agent_breakdown, data.trace_id);
+        }
+        loadRecentTraces();
       } catch (err) {
         resultDiv.innerHTML = `<span class="text-danger">Routing failed: ${err.message}</span>`;
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function renderAgentExecutionBreakdown(breakdown, traceId) {
+      if (!breakdown) return;
+
+      const tId = traceId || breakdown.trace_id;
+      if (tId) {
+        const badge = document.getElementById('triageTraceIdBadge');
+        if (badge) {
+          badge.innerText = tId.substring(0, 13) + '...';
+          badge.title = tId;
+        }
+      }
+
+      const agents = breakdown.agents || [];
+      // Agent 1: pathway_router_agent
+      if (agents[0]) {
+        const a1 = agents[0];
+        const statusEl = document.getElementById('agent1StatusBadge');
+        if (statusEl) {
+          statusEl.innerText = a1.status;
+          statusEl.className = a1.status === 'COMPLETED'
+            ? 'badge bg-success-subtle text-success border border-success-subtle'
+            : 'badge bg-warning-subtle text-warning border border-warning-subtle';
+        }
+        const latEl = document.getElementById('agent1Latency');
+        if (latEl) latEl.innerText = (a1.latency_ms || 0) + 'ms';
+        const hopEl = document.getElementById('agent1ResultHop');
+        if (hopEl && a1.output && a1.output.total_estimated_wait_days) {
+          hopEl.innerText = a1.output.total_estimated_wait_days + 'd Total Wait';
+        }
+        const listEl = document.getElementById('agent1ActionsList');
+        if (listEl && a1.decisions) {
+          listEl.innerHTML = a1.decisions.map(d => `<li>${escapeHtml(d)}</li>`).join('');
+        }
+      }
+
+      // Agent 2: network_audit_agent
+      if (agents[1]) {
+        const a2 = agents[1];
+        const statusEl = document.getElementById('agent2StatusBadge');
+        if (statusEl) {
+          statusEl.innerText = a2.status;
+          statusEl.className = a2.status === 'COMPLETED'
+            ? 'badge bg-success-subtle text-success border border-success-subtle'
+            : 'badge bg-warning-subtle text-warning border border-warning-subtle';
+        }
+        const latEl = document.getElementById('agent2Latency');
+        if (latEl) latEl.innerText = (a2.latency_ms || 0) + 'ms';
+        const packetEl = document.getElementById('agent2PacketStatus');
+        if (packetEl && a2.output) {
+          packetEl.innerText = a2.output.packet_validation_status || 'Packet Validated';
+        }
+        const listEl = document.getElementById('agent2ActionsList');
+        if (listEl && a2.decisions) {
+          listEl.innerHTML = a2.decisions.map(d => `<li>${escapeHtml(d)}</li>`).join('');
+        }
+      }
+
+      // Agent 3: equity_audit_agent
+      if (agents[2]) {
+        const a3 = agents[2];
+        const statusEl = document.getElementById('agent3StatusBadge');
+        if (statusEl) {
+          statusEl.innerText = a3.status;
+          statusEl.className = a3.status === 'COMPLETED'
+            ? 'badge bg-success-subtle text-success border border-success-subtle'
+            : 'badge bg-warning-subtle text-warning border border-warning-subtle';
+        }
+        const latEl = document.getElementById('agent3Latency');
+        if (latEl) latEl.innerText = (a3.latency_ms || 0) + 'ms';
+        const transEl = document.getElementById('agent3TransitStatus');
+        if (transEl && a3.output) {
+          transEl.innerText = a3.output.transit_guardrail_triggered ? 'Transit Van Req.' : 'Transit Normal';
+        }
+        const listEl = document.getElementById('agent3ActionsList');
+        if (listEl && a3.decisions) {
+          listEl.innerHTML = a3.decisions.map(d => `<li>${escapeHtml(d)}</li>`).join('');
+        }
+      }
+
+      // Agent 4: caregiver_note_agent
+      if (agents[3]) {
+        const a4 = agents[3];
+        const statusEl = document.getElementById('agent4StatusBadge');
+        if (statusEl) {
+          statusEl.innerText = a4.status;
+          statusEl.className = a4.status === 'COMPLETED'
+            ? 'badge bg-success-subtle text-success border border-success-subtle'
+            : 'badge bg-warning-subtle text-warning border border-warning-subtle';
+        }
+        const latEl = document.getElementById('agent4Latency');
+        if (latEl) latEl.innerText = (a4.latency_ms || 0) + 'ms';
+        const noteEl = document.getElementById('agent4NoteStatus');
+        if (noteEl && a4.output) {
+          noteEl.innerText = (a4.output.languages_generated || ['English', 'Spanish']).join('/') + ' Ready';
+        }
+        const listEl = document.getElementById('agent4ActionsList');
+        if (listEl && a4.decisions) {
+          listEl.innerHTML = a4.decisions.map(d => `<li>${escapeHtml(d)}</li>`).join('');
+        }
+      }
+    }
+
+    async function loadRecentTraces() {
+      const tbody = document.getElementById('bqTracesTableBody');
+      if (!tbody) return;
+      try {
+        const res = await fetch('/api/traces/recent?limit=15');
+        const data = await res.json();
+        const traces = data.traces || [];
+        if (traces.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No BigQuery traces logged yet. Click "Calculate Compliant Pathway" to stream live traces.</td></tr>';
+          return;
+        }
+        let html = '';
+        for (const t of traces) {
+          let timeFormatted = 'Just now';
+          if (t.timestamp) {
+            try {
+              const d = new Date(t.timestamp);
+              timeFormatted = d.toISOString().replace('T', ' ').substring(11, 19) + ' UTC';
+            } catch (e) {
+              timeFormatted = String(t.timestamp).substring(11, 19);
+            }
+          }
+          const isSuccess = t.status === 'SUCCESS' || t.status === 'COMPLETED';
+          const isWarning = t.status === 'WARNING';
+          const statusBadge = isSuccess
+            ? '<span class="badge bg-success-subtle text-success border border-success-subtle">SUCCESS</span>'
+            : (isWarning
+                ? '<span class="badge bg-warning-subtle text-warning border border-warning-subtle">WARNING</span>'
+                : `<span class="badge bg-danger-subtle text-danger border border-danger-subtle">${t.status}</span>`);
+
+          let agentColor = 'text-primary';
+          if (t.agent_name === 'network_audit_agent') agentColor = 'text-warning-emphasis';
+          else if (t.agent_name === 'equity_audit_agent') agentColor = 'text-info';
+          else if (t.agent_name === 'caregiver_note_agent') agentColor = 'text-purple';
+          else if (t.agent_name === 'milestone_navigator_agent') agentColor = 'text-danger';
+
+          let detailsShort = '';
+          try {
+            const parsed = typeof t.details_json === 'string' ? JSON.parse(t.details_json) : t.details_json;
+            detailsShort = JSON.stringify(parsed);
+            if (detailsShort.length > 80) detailsShort = detailsShort.substring(0, 80) + '...';
+          } catch (e) {
+            detailsShort = String(t.details_json || '').substring(0, 80);
+          }
+
+          html += `
+            <tr>
+              <td class="text-nowrap text-secondary font-monospace" style="font-size:0.72rem;">${timeFormatted}</td>
+              <td><code class="font-monospace text-dark fw-bold" style="font-size:0.72rem;" title="${escapeHtml(t.trace_id)}">${(t.trace_id || '').substring(0, 8)}...</code></td>
+              <td class="fw-semibold ${agentColor}"><i class="fa-solid fa-microchip me-1"></i>${t.agent_name}</td>
+              <td><span class="badge bg-light text-dark border font-monospace" style="font-size:0.68rem;">${t.event_type}</span></td>
+              <td>${statusBadge}</td>
+              <td class="text-secondary font-monospace">${t.latency_ms !== null && t.latency_ms !== undefined ? t.latency_ms + 'ms' : '-'}</td>
+              <td class="text-muted text-truncate font-monospace" style="max-width: 280px; font-size: 0.72rem;" title="${escapeHtml(t.details_json || '')}">${escapeHtml(detailsShort)}</td>
+            </tr>
+          `;
+        }
+        tbody.innerHTML = html;
+      } catch (err) {
+        console.error('Failed to load recent traces:', err);
+        tbody.innerHTML = `<tr><td colspan="7" class="text-danger text-center py-2">Error connecting to BigQuery traces: ${err.message}</td></tr>`;
       }
     }
 
