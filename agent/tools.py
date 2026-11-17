@@ -41,7 +41,7 @@ def trace_45day_breaches_and_bounce_hubs(min_wait_days: int = 45, limit: int = 1
     """
     bq = get_bq_client()
 
-    # 1. Variable-length ISO GQL traversal with case_chain_id correlation
+    # 1. Variable-length ISO GQL traversal with case_chain_id correlation and hop projections
     gql = f"""
     GRAPH {DATASET_ID}.ReferralGraph
     MATCH (clinic:CareNode {{node_role: 'Screening_Pediatric_Clinic'}})
@@ -52,7 +52,11 @@ def trace_45day_breaches_and_bounce_hubs(min_wait_days: int = 45, limit: int = 1
     LET total_hops = ARRAY_LENGTH(hops),
         chain_id = hops[OFFSET(0)].case_chain_id,
         chain_wait_days = (SELECT SUM(h.handoff_wait_days) FROM UNNEST(hops) AS h),
-        fax_hops = (SELECT COUNTIF(h.transmission_channel = 'paper_fax') FROM UNNEST(hops) AS h)
+        fax_hops = (SELECT COUNTIF(h.transmission_channel = 'paper_fax') FROM UNNEST(hops) AS h),
+        hop_sources = ARRAY(SELECT h.source_provider_id FROM UNNEST(hops) AS h),
+        hop_targets = ARRAY(SELECT h.target_provider_id FROM UNNEST(hops) AS h),
+        hop_channels = ARRAY(SELECT h.transmission_channel FROM UNNEST(hops) AS h),
+        hop_waits = ARRAY(SELECT h.handoff_wait_days FROM UNNEST(hops) AS h)
     FILTER chain_wait_days >= {min_wait_days}
     RETURN
       chain_id,
@@ -61,10 +65,18 @@ def trace_45day_breaches_and_bounce_hubs(min_wait_days: int = 45, limit: int = 1
       vendor.synthetic_organization_name AS final_vendor,
       total_hops,
       fax_hops,
-      chain_wait_days
+      chain_wait_days,
+      hop_sources,
+      hop_targets,
+      hop_channels,
+      hop_waits
     ORDER BY chain_wait_days DESC
     LIMIT {limit}
     """
+
+    # Fetch provider directory for node labeling
+    prov_df = bq.query(f"SELECT provider_id, synthetic_organization_name, node_role FROM `{DATASET_ID}.pediatric_and_ei_provider_directory`").to_dataframe()
+    prov_dict = prov_df.set_index("provider_id").to_dict("index")
 
     # 2. Bounce Hub Summary (comparing deceptive internal wait vs total breached chains caused)
     hub_sql = f"""
@@ -88,13 +100,55 @@ def trace_45day_breaches_and_bounce_hubs(min_wait_days: int = 45, limit: int = 1
     ORDER BY breached_chains_count DESC, paper_fax_handoffs DESC
     """
 
-    gql_results = bq.query(gql).to_dataframe().to_dict(orient="records")
+    gql_df = bq.query(gql).to_dataframe()
     hub_results = bq.query(hub_sql).to_dataframe().to_dict(orient="records")
+
+    # Construct interactive graph topology for visualization
+    visual_chains = []
+    for _, row in gql_df.iterrows():
+        c_id = row["chain_id"]
+        nodes_map = {}
+        edges_list = []
+        s_arr = row["hop_sources"]
+        t_arr = row["hop_targets"]
+        ch_arr = row["hop_channels"]
+        w_arr = row["hop_waits"]
+
+        for idx in range(len(s_arr)):
+            s_id = s_arr[idx]
+            t_id = t_arr[idx]
+            nodes_map[s_id] = {
+                "id": s_id,
+                "label": prov_dict.get(s_id, {}).get("synthetic_organization_name", s_id),
+                "role": prov_dict.get(s_id, {}).get("node_role", "Provider")
+            }
+            nodes_map[t_id] = {
+                "id": t_id,
+                "label": prov_dict.get(t_id, {}).get("synthetic_organization_name", t_id),
+                "role": prov_dict.get(t_id, {}).get("node_role", "Provider")
+            }
+            edges_list.append({
+                "from": s_id,
+                "to": t_id,
+                "channel": ch_arr[idx],
+                "wait_days": int(w_arr[idx]),
+                "label": f"{ch_arr[idx]} ({w_arr[idx]}d)"
+            })
+        visual_chains.append({
+            "chain_id": c_id,
+            "origin_clinic": row["origin_clinic"],
+            "final_vendor": row["final_vendor"],
+            "total_hops": int(row["total_hops"]),
+            "fax_hops": int(row["fax_hops"]),
+            "chain_wait_days": int(row["chain_wait_days"]),
+            "nodes": list(nodes_map.values()),
+            "edges": edges_list
+        })
 
     return {
         "status": "success",
         "description": "Multi-hop referral chains breaching the 45-day statutory limit and systemic bounce hubs",
-        "breached_chains_sample": gql_results,
+        "breached_chains_sample": visual_chains,
         "bounce_hub_audit": hub_results,
         "synthetic_disclosure": "NOTICE: All individual clinic, coordinator, and vendor entities are 100% [Synthetic] simulated records to preserve real-world clinical confidentiality.",
         "key_finding": "Intake coordinators like Jackson & Indianola maintain deceptive 5-6 day internal waitlists, yet their paper-fax transmission channels trigger cascading multi-hop re-referrals leading to 70+ day statutory breaches."

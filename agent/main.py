@@ -109,6 +109,7 @@ def index():
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>First Milestones - Early Intervention Triage & Network Audit</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
   <style>
     body { background-color: #f8f9fa; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     .hero { background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%); color: white; padding: 2.5rem 1.5rem; margin-bottom: 2rem; border-radius: 0 0 1rem 1rem; }
@@ -213,14 +214,48 @@ def index():
       </div>
     </div>
 
-    <!-- Graph Audit Findings -->
+    <!-- Interactive Graph Visualization of Referral Handoff Hops -->
     <div class="row mt-4">
       <div class="col-12">
         <div class="card p-4">
-          <h5 class="card-title">🕸️ BigQuery ISO GQL Multi-Hop Graph Traversal Findings</h5>
-          <p class="text-muted small">
-            Traversed with <code>GRAPH a4i_early_intervention.ReferralGraph MATCH (c:CareNode)-[hops:ReferralHandoff]->{2,4}(v:CareNode)</code> correlated on <code>case_chain_id</code>.
-          </p>
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div>
+              <h5 class="card-title mb-1">🕸️ Interactive ISO GQL Multi-Hop Referral Path Graph</h5>
+              <p class="text-muted small mb-0">
+                Visualizing multi-hop referral handoffs traversed via BigQuery ISO GQL (<code>CareNode-[ReferralHandoff]->{2,4}</code>).
+                Yellow dashed edges indicate <strong>paper fax handoffs</strong> causing downstream bounce backlogs.
+              </p>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <label class="form-label small mb-0 fw-bold">Select Breached Case Chain:</label>
+              <select id="chainSelector" class="form-select form-select-sm w-auto" onchange="renderSelectedChain()">
+                <option value="">Loading graph chains...</option>
+              </select>
+            </div>
+          </div>
+          <div id="chainMetrics" class="mb-2 small"></div>
+          <div id="graphNetwork" style="height: 380px; border: 1px solid #dee2e6; border-radius: 0.5rem; background-color: #fafbfc;"></div>
+          <div class="d-flex justify-content-between align-items-center mt-2 small text-muted">
+            <div>
+              <span class="badge bg-primary me-1">&nbsp;</span> Screening Clinic
+              <span class="badge bg-warning text-dark mx-1">&nbsp;</span> Part C Intake Coordinator (Bounce Hub)
+              <span class="badge bg-info text-dark mx-1">&nbsp;</span> Multidisciplinary Eval Hub
+              <span class="badge bg-success ms-1">&nbsp;</span> EI Therapy Vendor
+            </div>
+            <div>
+              <span style="color:#e65100; font-weight:bold;">--- Paper Fax Handoff</span> |
+              <span style="color:#0288d1; font-weight:bold;">— EHR Portal / Phone</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Graph Audit Findings Table -->
+    <div class="row mt-2">
+      <div class="col-12">
+        <div class="card p-4">
+          <h5 class="card-title">📊 Coordinator "Bounce Hub" Summary (Deceptive Waitlist vs Breaches)</h5>
           <div class="table-responsive">
             <table class="table table-sm table-striped">
               <thead class="table-light">
@@ -268,6 +303,109 @@ def index():
 
   <script>
     let sessionId = null;
+    let graphChains = [];
+    let networkInstance = null;
+
+    async function loadGraphChains() {
+      try {
+        const res = await fetch('/api/graph/breaches');
+        const data = await res.json();
+        graphChains = data.breached_chains_sample || [];
+        
+        const selector = document.getElementById('chainSelector');
+        selector.innerHTML = '';
+        graphChains.forEach((c, idx) => {
+          const opt = document.createElement('option');
+          opt.value = idx;
+          opt.textContent = `${c.chain_id} - ${c.chain_wait_days}d (${c.total_hops} hops, ${c.fax_hops} fax hops)`;
+          selector.appendChild(opt);
+        });
+
+        if (graphChains.length > 0) {
+          renderSelectedChain();
+        }
+      } catch (err) {
+        console.error('Failed to load graph chains', err);
+      }
+    }
+
+    function renderSelectedChain() {
+      const selector = document.getElementById('chainSelector');
+      const idx = parseInt(selector.value);
+      if (isNaN(idx) || !graphChains[idx]) return;
+
+      const chain = graphChains[idx];
+      const metricsDiv = document.getElementById('chainMetrics');
+      metricsDiv.innerHTML = `
+        <span class="badge badge-breach me-2">Chain: ${chain.chain_id}</span>
+        <span class="text-danger fw-bold me-2">Cumulative Wait: ${chain.chain_wait_days} Days (Statutory Breach: +${chain.chain_wait_days - 45}d)</span> |
+        <span class="text-muted ms-2">Hops: ${chain.total_hops} | Paper Fax Handoffs: ${chain.fax_hops}</span>
+      `;
+
+      // Build Vis.js Nodes
+      const roleColors = {
+        'Screening_Pediatric_Clinic': '#1a73e8',
+        'Part_C_Intake_Coordinator': '#f29900',
+        'Multidisciplinary_Eval_Hub': '#00acc1',
+        'EI_Therapy_Vendor': '#2e7d32'
+      };
+
+      const nodes = chain.nodes.map(n => ({
+        id: n.id,
+        label: n.label.replace(' [Synthetic]', ''),
+        shape: 'box',
+        margin: 10,
+        color: {
+          background: roleColors[n.role] || '#5f6368',
+          border: '#3c4043',
+          highlight: { background: '#d93025', border: '#b31412' }
+        },
+        font: { color: '#ffffff', size: 12, bold: true },
+        shadow: true
+      }));
+
+      // Build Vis.js Edges
+      const edges = chain.edges.map(e => {
+        const isFax = e.channel === 'paper_fax';
+        return {
+          from: e.from,
+          to: e.to,
+          label: `${e.channel}\n(+${e.wait_days}d)`,
+          arrows: 'to',
+          color: { color: isFax ? '#e65100' : '#1976d2' },
+          dashes: isFax,
+          width: isFax ? 3 : 2,
+          font: { size: 11, align: 'top', background: '#ffffff', strokeWidth: 0 }
+        };
+      });
+
+      const container = document.getElementById('graphNetwork');
+      const data = {
+        nodes: new vis.DataSet(nodes),
+        edges: new vis.DataSet(edges)
+      };
+
+      const options = {
+        layout: {
+          hierarchical: {
+            direction: 'LR',
+            sortMethod: 'directed',
+            levelSeparation: 220,
+            nodeSpacing: 100
+          }
+        },
+        physics: false,
+        interaction: { hover: true, zoomView: true, dragView: true }
+      };
+
+      if (networkInstance) {
+        networkInstance.destroy();
+      }
+      networkInstance = new vis.Network(container, data, options);
+    }
+
+    // Load graph chains on page ready
+    window.addEventListener('DOMContentLoaded', loadGraphChains);
 
     async function sendMessage() {
       const input = document.getElementById('userInput');
