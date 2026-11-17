@@ -31,7 +31,16 @@ from google.cloud import bigquery
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "qwiklabs-gcp-03-4b836a7f2e04")
 DATASET_ID = os.environ.get("A4I_DATASET", "a4i_early_intervention")
 LOCATION = os.environ.get("A4I_LOCATION", "US")
-DEFAULT_STATE = os.environ.get("A4I_STATE", "MS")
+DEFAULT_STATE = os.environ.get("A4I_STATE", "NY")
+
+FIPS_TO_STATE = {
+    "01": "AL",
+    "06": "CA",
+    "13": "GA",
+    "28": "MS",
+    "36": "NY",
+    "48": "TX",
+}
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = REPO_ROOT / "data"
@@ -66,7 +75,11 @@ def _haversine_miles(lat1: float, lon1: float, lat2: float, lon2: float) -> floa
     return round(2.0 * r_miles * math.atan2(math.sqrt(a), math.sqrt(max(0.0, 1.0 - a))), 1)
 
 
-def trace_45day_breaches_and_bounce_hubs(min_wait_days: int = 45, limit: int = 10) -> Dict[str, Any]:
+def trace_45day_breaches_and_bounce_hubs(
+    min_wait_days: int = 45,
+    limit: int = 10,
+    state_code: str = DEFAULT_STATE,
+) -> Dict[str, Any]:
     """
     Executes a variable-length ISO GQL traversal over BigQuery Property Graph (ReferralGraph).
 
@@ -130,21 +143,26 @@ def trace_45day_breaches_and_bounce_hubs(min_wait_days: int = 45, limit: int = 1
     ORDER BY breached_chains_count DESC, paper_fax_handoffs DESC
     """
 
+    target_state = (state_code or DEFAULT_STATE).strip().upper()
     try:
         bq = get_bq_client()
         prov_df = bq.query(
-            f"SELECT provider_id, synthetic_organization_name, node_role, median_internal_wait_days, "
+            f"SELECT provider_id, state_code, synthetic_organization_name, node_role, median_internal_wait_days, "
             f"active_waitlist_count, accepts_medicaid, bilingual_services_listed "
             f"FROM `{DATASET_ID}.pediatric_and_ei_provider_directory`"
         ).to_dataframe()
+        if not prov_df.empty and "state_code" in prov_df.columns:
+            bq_states = set(prov_df["state_code"].astype(str).str.upper().unique())
+            if target_state not in bq_states:
+                raise ValueError(f"BigQuery holds {bq_states}, switching to {target_state} parquet dataset")
         prov_dict = prov_df.set_index("provider_id").to_dict("index")
         gql_df = bq.query(gql).to_dataframe()
         hub_results = bq.query(hub_sql).to_dataframe().to_dict(orient="records")
         execution_mode = "bigquery_iso_gql"
     except Exception:
-        # Local GeoParquet graph traversal fallback
-        prov_df = _load_local_parquet("pediatric_and_ei_provider_directory")
-        ref_df = _load_local_parquet("deidentified_part_c_referral_logs")
+        # Local GeoParquet graph traversal for target_state (e.g. NY or MS)
+        prov_df = _load_local_parquet("pediatric_and_ei_provider_directory", state_code=target_state)
+        ref_df = _load_local_parquet("deidentified_part_c_referral_logs", state_code=target_state)
         prov_dict = prov_df.set_index("provider_id").to_dict("index")
 
         records = []
@@ -262,7 +280,7 @@ def trace_45day_breaches_and_bounce_hubs(min_wait_days: int = 45, limit: int = 1
 
 def find_compliant_toddler_pathway(
     child_age_months: int,
-    census_tract_geoid: Optional[str] = "28083950200",
+    census_tract_geoid: Optional[str] = "36005019700",
     requires_medicaid: bool = True,
     requires_bilingual: bool = True,
     max_wait_days: int = 45,
@@ -280,7 +298,8 @@ def find_compliant_toddler_pathway(
     - Trap 10 (Age-out cliff): Flags critical alerts if child is >= 30 months old approaching 36m age-out.
     - Trap 11 (Defamation): Explicitly labels all suggested entities as [Synthetic].
     """
-    clean_geoid = str(census_tract_geoid).strip().zfill(11) if census_tract_geoid else "28083950200"
+    clean_geoid = str(census_tract_geoid).strip().zfill(11) if census_tract_geoid else "36005019700"
+    inferred_state = FIPS_TO_STATE.get(clean_geoid[:2], DEFAULT_STATE)
 
     # Genuine variable-length ISO GQL pathway discovery query over ReferralGraph
     gql_pathway_query = f"""
@@ -385,11 +404,13 @@ def find_compliant_toddler_pathway(
         bq = get_bq_client()
         gql_verified_chains = bq.query(gql_pathway_query).to_dataframe().to_dict(orient="records")
         routes = bq.query(sql).to_dataframe().to_dict(orient="records")
+        if not routes:
+            raise ValueError(f"Tract {clean_geoid} ({inferred_state}) not in current BQ state load")
     except Exception:
-        # Local GeoParquet fallback
-        prov_df = _load_local_parquet("pediatric_and_ei_provider_directory")
-        ref_df = _load_local_parquet("deidentified_part_c_referral_logs")
-        acs_df = _load_local_parquet("acs_under5_tract_demographics")
+        # Local GeoParquet graph traversal for inferred_state (e.g. NY or MS)
+        prov_df = _load_local_parquet("pediatric_and_ei_provider_directory", state_code=inferred_state)
+        ref_df = _load_local_parquet("deidentified_part_c_referral_logs", state_code=inferred_state)
+        acs_df = _load_local_parquet("acs_under5_tract_demographics", state_code=inferred_state)
 
         tract_rows = acs_df[acs_df["census_tract_geoid"] == clean_geoid]
         if tract_rows.empty:

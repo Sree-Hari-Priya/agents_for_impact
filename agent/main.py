@@ -50,7 +50,7 @@ class ChatRequest(BaseModel):
 
 class TriageRequest(BaseModel):
     child_age_months: int = 22
-    census_tract_geoid: Optional[str] = "28083950200"
+    census_tract_geoid: Optional[str] = "36005019700"
     requires_medicaid: bool = True
     requires_bilingual: bool = True
     max_wait_days: int = 45
@@ -82,8 +82,8 @@ async def chat(req: ChatRequest):
     }
 
 @app.get("/api/graph/breaches")
-def get_breaches(min_wait_days: int = 45, limit: int = 10):
-    return trace_45day_breaches_and_bounce_hubs(min_wait_days=min_wait_days, limit=limit)
+def get_breaches(min_wait_days: int = 45, limit: int = 10, state_code: str = "NY"):
+    return trace_45day_breaches_and_bounce_hubs(min_wait_days=min_wait_days, limit=limit, state_code=state_code)
 
 @app.post("/api/triage/route")
 def triage_route(req: TriageRequest):
@@ -139,7 +139,10 @@ def index():
           </div>
         </div>
         <div class="text-end">
-          <span class="badge bg-warning text-dark px-3 py-2">State: Mississippi (MS)</span>
+          <div class="btn-group btn-group-sm mb-1" role="group">
+            <button id="btnStateNY" type="button" class="btn btn-warning fw-bold text-dark" onclick="setActiveState('NY')">State: New York (NY)</button>
+            <button id="btnStateMS" type="button" class="btn btn-outline-light" onclick="setActiveState('MS')">Mississippi (MS)</button>
+          </div>
           <div class="small mt-1 text-light">100% [Synthetic] Provider Topology · Illustrative Photo</div>
         </div>
       </div>
@@ -149,7 +152,7 @@ def index():
           <span class="small text-uppercase fw-bold opacity-75 me-1">Working Track Mode:</span>
           <div class="btn-group" role="group">
             <button id="btnTrack1" type="button" class="btn btn-sm btn-light fw-semibold text-primary active" onclick="activateTrack(1)">
-              Track 1: Today's Referral (<=45d Route)
+              Track 1: Today's Referral (&le;45d Route)
             </button>
             <button id="btnTrack2" type="button" class="btn btn-sm btn-outline-light fw-semibold" onclick="activateTrack(2)">
               Track 2: Quarterly Audit (Bounce Hubs)
@@ -160,7 +163,7 @@ def index():
           </div>
         </div>
         <div id="trackBannerInfo" class="small text-white-50">
-          Ready to route a 20-month-old Spanish-speaking Medicaid referral in Leflore County.
+          Ready to route a 20-month-old Spanish-speaking Medicaid referral in Bronx County, NY (Tract 36005019700).
         </div>
       </div>
     </div>
@@ -204,7 +207,7 @@ def index():
           <div id="chatBox" class="chat-box mb-3">
             <div class="msg-agent">Hello Coordinator. I am your Early Intervention Triage Assistant. You can ask me to:
 • "Trace 3-to-4 hop referral chains breaching 45 days and show bounce hubs."
-• "Route a 22-month-old Spanish-speaking Medicaid toddler near tract 28083950200."
+• "Route a 22-month-old Spanish-speaking Medicaid toddler near tract 36005019700."
 • "Perform an Equity Audit on multi-hop delays and counterfactual e-fax savings."
 • "Generate bilingual caregiver action notes."</div>
           </div>
@@ -225,7 +228,7 @@ def index():
           </div>
           <div class="mb-2">
             <label class="form-label small mb-1">Census Tract GEOID</label>
-            <input type="text" id="tractGeoid" class="form-control form-control-sm" value="28083950200">
+            <input type="text" id="tractGeoid" class="form-control form-control-sm" value="36005019700">
           </div>
           <div class="form-check form-switch mb-2">
             <input class="form-check-input" type="checkbox" id="reqMedicaid" checked>
@@ -248,16 +251,16 @@ def index():
         <div class="card p-4">
           <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
             <div>
-              <h5 class="card-title mb-1">🕸️ ReferralGraph Side-by-Side Pathway &amp; 45-Day Statutory Clock</h5>
-              <p class="text-muted small mb-0">
-                Comparing the <strong>75-day 4-hop paper-fax bounce loop (CHAIN-MS-023, 32m toddler)</strong> vs. the <strong>37-day 3-hop e-referral route (CHAIN-MS-007)</strong> &amp; <strong>17-day 2-hop fast-track (CHAIN-MS-031)</strong> from the exact same clinic &amp; coordinator.
+              <h5 id="graphCardTitle" class="card-title mb-1">🕸️ ReferralGraph (NY) Side-by-Side Pathway &amp; 45-Day Statutory Clock</h5>
+              <p id="graphCardSubtitle" class="text-muted small mb-0">
+                Comparing the <strong>70-day 4-hop paper-fax bounce loop (CHAIN-NY-023, 32m toddler)</strong> vs. the <strong>40-day 3-hop e-referral route (CHAIN-NY-007)</strong> &amp; <strong>22-day 2-hop fast-track (CHAIN-NY-031)</strong> from the exact same NY clinic &amp; coordinator.
               </p>
             </div>
             <div class="btn-group btn-group-sm" role="group">
               <button id="btn-mode-both" type="button" class="btn btn-primary" onclick="setSvgGraphMode('both')">Compare Bounce vs. &le;45d Route</button>
-              <button id="btn-mode-bounce" type="button" class="btn btn-outline-danger" onclick="setSvgGraphMode('bounce')">🚨 4-Hop Fax Bounce (75d)</button>
-              <button id="btn-mode-eval" type="button" class="btn btn-outline-success" onclick="setSvgGraphMode('eval')">✅ 3-Hop E-Referral (37d)</button>
-              <button id="btn-mode-fast" type="button" class="btn btn-outline-info" onclick="setSvgGraphMode('fast')">⚡ 2-Hop Fast-Track (17d)</button>
+              <button id="btn-mode-bounce" type="button" class="btn btn-outline-danger" onclick="setSvgGraphMode('bounce')">🚨 4-Hop Fax Bounce</button>
+              <button id="btn-mode-eval" type="button" class="btn btn-outline-success" onclick="setSvgGraphMode('eval')">✅ 3-Hop E-Referral</button>
+              <button id="btn-mode-fast" type="button" class="btn btn-outline-info" onclick="setSvgGraphMode('fast')">⚡ 2-Hop Fast-Track</button>
             </div>
           </div>
 
@@ -273,7 +276,7 @@ def index():
     <div class="row mt-2">
       <div class="col-12">
         <div class="card p-4">
-          <h5 class="card-title">📊 Coordinator "Bounce Hub" Summary (Deceptive Waitlist vs Breaches)</h5>
+          <h5 id="bounceTableTitle" class="card-title">📊 New York (NY) Coordinator "Bounce Hub" Summary (Deceptive Waitlist vs Breaches)</h5>
           <div class="table-responsive">
             <table class="table table-sm table-striped">
               <thead class="table-light">
@@ -286,31 +289,7 @@ def index():
                   <th>Impact Assessment</th>
                 </tr>
               </thead>
-              <tbody>
-                <tr>
-                  <td><strong>Indianola Regional Intake Desk (SYN-PROV-MS-011)</strong></td>
-                  <td><span class="badge bg-success">5 days</span></td>
-                  <td>24</td>
-                  <td>5 handoffs</td>
-                  <td><span class="badge badge-breach">7 breaches (70+ days)</span></td>
-                  <td>Hidden bottleneck; low waitlist conceals paper-fax dropoffs.</td>
-                </tr>
-                <tr>
-                  <td><strong>Jackson Regional Intake Desk (SYN-PROV-MS-012)</strong></td>
-                  <td><span class="badge bg-success">6 days</span></td>
-                  <td>29</td>
-                  <td>5 handoffs</td>
-                  <td><span class="badge badge-breach">7 breaches (70+ days)</span></td>
-                  <td>Systemic re-referral hub lacking bilingual coordinator handoffs.</td>
-                </tr>
-                <tr>
-                  <td><strong>Cleveland Regional Intake Desk (SYN-PROV-MS-009)</strong></td>
-                  <td><span class="badge bg-success">8 days</span></td>
-                  <td>14</td>
-                  <td>4 handoffs</td>
-                  <td><span class="badge badge-breach">6 breaches (70+ days)</span></td>
-                  <td>Cross-county bounces into backlogged eval hubs.</td>
-                </tr>
+              <tbody id="bounceTableBody">
               </tbody>
             </table>
           </div>
@@ -321,6 +300,152 @@ def index():
 
   <script>
     let sessionId = null;
+    let activeState = "NY";
+
+    const STATE_DATA = {
+      NY: {
+        name: "New York (NY)",
+        county: "Bronx County",
+        tract: "36005019700",
+        nodes: [
+          { id: "SYN-PROV-NY-007", short: "NY-007 (Lockport Clinic)", wait: 6, x: 75, y: 115, color: "#38bdf8" },
+          { id: "SYN-PROV-NY-011", short: "NY-011 (Walton Bounce Hub)", wait: 5, x: 265, y: 115, color: "#f59e0b", bounceHub: true },
+          { id: "SYN-PROV-NY-015", short: "NY-015 (Canton Saturated)", wait: 34, x: 470, y: 52, color: "#ef4444" },
+          { id: "SYN-PROV-NY-019", short: "NY-019 (Lockport Bilingual)", wait: 7, x: 470, y: 145, color: "#a855f7" },
+          { id: "SYN-PROV-NY-028", short: "NY-028 (Malone Therapy)", wait: 6, x: 675, y: 52, color: "#10b981" },
+          { id: "SYN-PROV-NY-027", short: "NY-027 (Canton Therapy)", wait: 10, x: 675, y: 145, color: "#10b981" },
+          { id: "SYN-PROV-NY-026", short: "NY-026 (Jamestown Therapy)", wait: 8, x: 675, y: 205, color: "#10b981" }
+        ],
+        paths: {
+          bounce: {
+            id: "CHAIN-NY-023",
+            title: "🚨 CHAIN-NY-023: 4-Hop Paper-Fax Bounce (70 Days — Breaches 45d Limit!)",
+            subtitle: "32-month-old toddler (4 mos from 36m Part C aging-out cliff!) • Autism/Speech Screen",
+            total: 70,
+            color: "#ef4444",
+            edges: [
+              { from: "SYN-PROV-NY-007", to: "SYN-PROV-NY-011", hop: 1, days: 12, chan: "paper_fax", dy: -12 },
+              { from: "SYN-PROV-NY-011", to: "SYN-PROV-NY-015", hop: 2, days: 20, chan: "paper_fax", dy: -8 },
+              { from: "SYN-PROV-NY-015", to: "SYN-PROV-NY-019", hop: 3, days: 22, chan: "paper_fax", dy: 0 },
+              { from: "SYN-PROV-NY-019", to: "SYN-PROV-NY-028", hop: 4, days: 16, chan: "ehr_portal", dy: -8 }
+            ]
+          },
+          eval: {
+            id: "CHAIN-NY-007",
+            title: "✅ CHAIN-NY-007: 3-Hop Electronic Bilingual Route (40 Days — Saves 30 Days!)",
+            subtitle: "Same Clinic (NY-007) & Same Coordinator (NY-011), routed via EHR directly to NY-019",
+            total: 40,
+            color: "#22c55e",
+            edges: [
+              { from: "SYN-PROV-NY-007", to: "SYN-PROV-NY-011", hop: 1, days: 9, chan: "ehr_portal", dy: 14 },
+              { from: "SYN-PROV-NY-011", to: "SYN-PROV-NY-019", hop: 2, days: 14, chan: "ehr_portal", dy: 10 },
+              { from: "SYN-PROV-NY-019", to: "SYN-PROV-NY-027", hop: 3, days: 17, chan: "ehr_portal", dy: 10 }
+            ]
+          },
+          fast: {
+            id: "CHAIN-NY-031",
+            title: "⚡ CHAIN-NY-031: 2-Hop Electronic Fast-Track (22 Days — Saves 48 Days!)",
+            subtitle: "Direct Fast-Track IFSP Placement for eligible NY toddlers via EHR Portal",
+            total: 22,
+            color: "#38bdf8",
+            edges: [
+              { from: "SYN-PROV-NY-007", to: "SYN-PROV-NY-011", hop: 1, days: 8, chan: "ehr_portal", dy: 18 },
+              { from: "SYN-PROV-NY-011", to: "SYN-PROV-NY-026", hop: 2, days: 14, chan: "ehr_portal", dy: 14 }
+            ]
+          }
+        },
+        hubs: [
+          { name: "Walton Regional Intake Desk (SYN-PROV-NY-011)", wait: "5 days", list: 24, fax: "5 handoffs", breaches: "7 breaches (70+ days)", note: "Hidden bottleneck; low waitlist conceals paper-fax dropoffs." },
+          { name: "Bronx Regional Intake Desk (SYN-PROV-NY-012)", wait: "6 days", list: 29, fax: "5 handoffs", breaches: "7 breaches (70+ days)", note: "Urban high-volume re-referral hub with paper-fax delays." },
+          { name: "Canton Regional Intake Desk (SYN-PROV-NY-009)", wait: "8 days", list: 14, fax: "4 handoffs", breaches: "6 breaches (70+ days)", note: "North Country cross-county bounces into backlogged eval hubs." }
+        ]
+      },
+      MS: {
+        name: "Mississippi (MS)",
+        county: "Leflore County",
+        tract: "28083950200",
+        nodes: [
+          { id: "SYN-PROV-MS-007", short: "MS-007 (Clinic)", wait: 6, x: 75, y: 115, color: "#38bdf8" },
+          { id: "SYN-PROV-MS-011", short: "MS-011 (Bounce Hub)", wait: 5, x: 265, y: 115, color: "#f59e0b", bounceHub: true },
+          { id: "SYN-PROV-MS-015", short: "MS-015 (Saturated Eval)", wait: 34, x: 470, y: 52, color: "#ef4444" },
+          { id: "SYN-PROV-MS-019", short: "MS-019 (Bilingual Eval)", wait: 7, x: 470, y: 145, color: "#a855f7" },
+          { id: "SYN-PROV-MS-028", short: "MS-028 (Therapy)", wait: 6, x: 675, y: 52, color: "#10b981" },
+          { id: "SYN-PROV-MS-027", short: "MS-027 (Therapy)", wait: 10, x: 675, y: 145, color: "#10b981" },
+          { id: "SYN-PROV-MS-026", short: "MS-026 (Therapy)", wait: 8, x: 675, y: 205, color: "#10b981" }
+        ],
+        paths: {
+          bounce: {
+            id: "CHAIN-MS-023",
+            title: "🚨 CHAIN-MS-023: 4-Hop Paper-Fax Bounce (75 Days — Breaches 45d Limit!)",
+            subtitle: "32-month-old toddler (4 mos from 36m Part C aging-out cliff!) • Expressive/Autism Screen",
+            total: 75,
+            color: "#ef4444",
+            edges: [
+              { from: "SYN-PROV-MS-007", to: "SYN-PROV-MS-011", hop: 1, days: 14, chan: "paper_fax", dy: -12 },
+              { from: "SYN-PROV-MS-011", to: "SYN-PROV-MS-015", hop: 2, days: 22, chan: "paper_fax", dy: -8 },
+              { from: "SYN-PROV-MS-015", to: "SYN-PROV-MS-019", hop: 3, days: 25, chan: "paper_fax", dy: 0 },
+              { from: "SYN-PROV-MS-019", to: "SYN-PROV-MS-028", hop: 4, days: 14, chan: "ehr_portal", dy: -8 }
+            ]
+          },
+          eval: {
+            id: "CHAIN-MS-007",
+            title: "✅ CHAIN-MS-007: 3-Hop Electronic Bilingual Route (37 Days — Saves 38 Days!)",
+            subtitle: "Same Clinic (MS-007) & Same Coordinator (MS-011), routed via EHR directly to MS-019",
+            total: 37,
+            color: "#22c55e",
+            edges: [
+              { from: "SYN-PROV-MS-007", to: "SYN-PROV-MS-011", hop: 1, days: 6, chan: "ehr_portal", dy: 14 },
+              { from: "SYN-PROV-MS-011", to: "SYN-PROV-MS-019", hop: 2, days: 14, chan: "ehr_portal", dy: 10 },
+              { from: "SYN-PROV-MS-019", to: "SYN-PROV-MS-027", hop: 3, days: 17, chan: "ehr_portal", dy: 10 }
+            ]
+          },
+          fast: {
+            id: "CHAIN-MS-031",
+            title: "⚡ CHAIN-MS-031: 2-Hop Electronic Fast-Track (17 Days — Saves 58 Days!)",
+            subtitle: "Direct Fast-Track IFSP Placement for eligible toddlers via EHR Portal",
+            total: 17,
+            color: "#38bdf8",
+            edges: [
+              { from: "SYN-PROV-MS-007", to: "SYN-PROV-MS-011", hop: 1, days: 5, chan: "ehr_portal", dy: 18 },
+              { from: "SYN-PROV-MS-011", to: "SYN-PROV-MS-026", hop: 2, days: 12, chan: "ehr_portal", dy: 14 }
+            ]
+          }
+        },
+        hubs: [
+          { name: "Indianola Regional Intake Desk (SYN-PROV-MS-011)", wait: "5 days", list: 24, fax: "5 handoffs", breaches: "7 breaches (70+ days)", note: "Hidden bottleneck; low waitlist conceals paper-fax dropoffs." },
+          { name: "Jackson Regional Intake Desk (SYN-PROV-MS-012)", wait: "6 days", list: 29, fax: "5 handoffs", breaches: "7 breaches (70+ days)", note: "Systemic re-referral hub lacking bilingual coordinator handoffs." },
+          { name: "Cleveland Regional Intake Desk (SYN-PROV-MS-009)", wait: "8 days", list: 14, fax: "4 handoffs", breaches: "6 breaches (70+ days)", note: "Cross-county bounces into backlogged eval hubs." }
+        ]
+      }
+    };
+
+    let svgGraphNodes = STATE_DATA.NY.nodes;
+    let svgGraphPaths = STATE_DATA.NY.paths;
+
+    function setActiveState(st) {
+      activeState = st;
+      const cfg = STATE_DATA[st];
+      svgGraphNodes = cfg.nodes;
+      svgGraphPaths = cfg.paths;
+      document.getElementById('btnStateNY').className = st === 'NY' ? 'btn btn-warning fw-bold text-dark' : 'btn btn-outline-light';
+      document.getElementById('btnStateMS').className = st === 'MS' ? 'btn btn-warning fw-bold text-dark' : 'btn btn-outline-light';
+      document.getElementById('tractGeoid').value = cfg.tract;
+      document.getElementById('graphCardTitle').innerHTML = `🕸️ ReferralGraph (${st}) Side-by-Side Pathway &amp; 45-Day Statutory Clock`;
+      document.getElementById('graphCardSubtitle').innerHTML = `Comparing the <strong>${cfg.paths.bounce.total}-day 4-hop paper-fax bounce loop (${cfg.paths.bounce.id}, 32m toddler)</strong> vs. the <strong>${cfg.paths.eval.total}-day 3-hop e-referral route (${cfg.paths.eval.id})</strong> &amp; <strong>${cfg.paths.fast.total}-day 2-hop fast-track (${cfg.paths.fast.id})</strong> from the exact same ${st} clinic &amp; coordinator.`;
+      document.getElementById('bounceTableTitle').innerText = `📊 ${cfg.name} Coordinator "Bounce Hub" Summary (Deceptive Waitlist vs Breaches)`;
+      document.getElementById('bounceTableBody').innerHTML = cfg.hubs.map(h => `
+        <tr>
+          <td><strong>${h.name}</strong></td>
+          <td><span class="badge bg-success">${h.wait}</span></td>
+          <td>${h.list}</td>
+          <td>${h.fax}</td>
+          <td><span class="badge badge-breach">${h.breaches}</span></td>
+          <td>${h.note}</td>
+        </tr>
+      `).join('');
+      document.getElementById('trackBannerInfo').innerHTML = `Ready to route a 20-month-old Spanish-speaking Medicaid referral in ${cfg.county}, ${st} (Tract ${cfg.tract}).`;
+      renderSvgComparisonGraph();
+    }
 
     function activateTrack(trackNum) {
       document.getElementById('btnTrack1').className = trackNum === 1 ? 'btn btn-sm btn-light fw-semibold text-primary active' : 'btn btn-sm btn-outline-light fw-semibold';
@@ -329,76 +454,28 @@ def index():
 
       const info = document.getElementById('trackBannerInfo');
       const input = document.getElementById('userInput');
+      const cfg = STATE_DATA[activeState];
 
       if (trackNum === 1) {
         info.innerHTML = "<strong>Track 1 Active:</strong> Route today's toddler referral (&le;45d compliant path with 36m age cliff guard).";
-        input.value = "Route a 20-month-old Spanish-speaking Medicaid toddler in Leflore County tract 28083950200.";
+        input.value = `Route a 20-month-old Spanish-speaking Medicaid toddler in ${cfg.county} tract ${cfg.tract}.`;
         document.getElementById('childAge').scrollIntoView({ behavior: 'smooth' });
       } else if (trackNum === 2) {
         info.innerHTML = "<strong>Track 2 Active:</strong> Variable-length GQL exposes systemic paper-fax bounce hubs breaking federal clock.";
-        input.value = "Trace 3-to-4 hop referral chains breaching 45 days and identify the regional bounce hubs.";
+        input.value = `Trace 3-to-4 hop referral chains breaching 45 days in ${activeState} and identify the regional bounce hubs.`;
         setSvgGraphMode('both');
         document.getElementById('svgReferralGraph').scrollIntoView({ behavior: 'smooth' });
       } else if (trackNum === 3) {
         info.innerHTML = "<strong>Track 3 Active:</strong> Combine ACS under-5 poverty & NSCH screening baselines to deploy mobile screening days.";
-        input.value = "Where should community developmental screening outreach days go first in Mississippi?";
+        input.value = `Where should community developmental screening outreach days go first in ${cfg.name}?`;
         document.getElementById('chatBox').scrollIntoView({ behavior: 'smooth' });
       }
     }
 
-    // Load SVG referral comparison graph on page ready
+    // Load SVG referral comparison graph on page ready (defaults to NY)
     window.addEventListener('DOMContentLoaded', () => {
-      renderSvgComparisonGraph();
+      setActiveState('NY');
     });
-
-    const svgGraphNodes = [
-      { id: "SYN-PROV-MS-007", short: "MS-007 (Clinic)", wait: 6, x: 75, y: 115, color: "#38bdf8" },
-      { id: "SYN-PROV-MS-011", short: "MS-011 (Bounce Hub)", wait: 5, x: 265, y: 115, color: "#f59e0b", bounceHub: true },
-      { id: "SYN-PROV-MS-015", short: "MS-015 (Saturated Eval)", wait: 34, x: 470, y: 52, color: "#ef4444" },
-      { id: "SYN-PROV-MS-019", short: "MS-019 (Bilingual Eval)", wait: 7, x: 470, y: 145, color: "#a855f7" },
-      { id: "SYN-PROV-MS-028", short: "MS-028 (Therapy)", wait: 6, x: 675, y: 52, color: "#10b981" },
-      { id: "SYN-PROV-MS-027", short: "MS-027 (Therapy)", wait: 10, x: 675, y: 145, color: "#10b981" },
-      { id: "SYN-PROV-MS-026", short: "MS-026 (Therapy)", wait: 8, x: 675, y: 205, color: "#10b981" }
-    ];
-
-    const svgGraphPaths = {
-      bounce: {
-        id: "CHAIN-MS-023",
-        title: "🚨 CHAIN-MS-023: 4-Hop Paper-Fax Bounce (75 Days — Breaches 45d Limit!)",
-        subtitle: "32-month-old toddler (4 mos from 36m Part C aging-out cliff!) • Expressive/Autism Screen",
-        total: 75,
-        color: "#ef4444",
-        edges: [
-          { from: "SYN-PROV-MS-007", to: "SYN-PROV-MS-011", hop: 1, days: 14, chan: "paper_fax", dy: -12 },
-          { from: "SYN-PROV-MS-011", to: "SYN-PROV-MS-015", hop: 2, days: 22, chan: "paper_fax", dy: -8 },
-          { from: "SYN-PROV-MS-015", to: "SYN-PROV-MS-019", hop: 3, days: 25, chan: "paper_fax", dy: 0 },
-          { from: "SYN-PROV-MS-019", to: "SYN-PROV-MS-028", hop: 4, days: 14, chan: "ehr_portal", dy: -8 }
-        ]
-      },
-      eval: {
-        id: "CHAIN-MS-007",
-        title: "✅ CHAIN-MS-007: 3-Hop Electronic Bilingual Route (37 Days — Saves 38 Days!)",
-        subtitle: "Same Clinic (MS-007) & Same Coordinator (MS-011), routed via EHR directly to MS-019",
-        total: 37,
-        color: "#22c55e",
-        edges: [
-          { from: "SYN-PROV-MS-007", to: "SYN-PROV-MS-011", hop: 1, days: 6, chan: "ehr_portal", dy: 14 },
-          { from: "SYN-PROV-MS-011", to: "SYN-PROV-MS-019", hop: 2, days: 14, chan: "ehr_portal", dy: 10 },
-          { from: "SYN-PROV-MS-019", to: "SYN-PROV-MS-027", hop: 3, days: 17, chan: "ehr_portal", dy: 10 }
-        ]
-      },
-      fast: {
-        id: "CHAIN-MS-031",
-        title: "⚡ CHAIN-MS-031: 2-Hop Electronic Fast-Track (17 Days — Saves 58 Days!)",
-        subtitle: "Direct Fast-Track IFSP Placement for eligible toddlers via EHR Portal",
-        total: 17,
-        color: "#38bdf8",
-        edges: [
-          { from: "SYN-PROV-MS-007", to: "SYN-PROV-MS-011", hop: 1, days: 5, chan: "ehr_portal", dy: 18 },
-          { from: "SYN-PROV-MS-011", to: "SYN-PROV-MS-026", hop: 2, days: 12, chan: "ehr_portal", dy: 14 }
-        ]
-      }
-    };
 
     let svgCurrentMode = "both";
 
