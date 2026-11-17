@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>First Milestones — IDEA Part C Triage & Network-Audit Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        darkMode: true,
+        background: '#0d1117',
+        primaryColor: '#1e293b',
+        primaryTextColor: '#f8fafc',
+        primaryBorderColor: '#38bdf8',
+        lineColor: '#60a5fa',
+        secondaryColor: '#0f172a',
+        tertiaryColor: '#1e1b4b'
+      }
+    });
+  </script>
+  <style>
+    :root {
+      --bg-deep: #090d16;
+      --bg-card: rgba(17, 24, 39, 0.75);
+      --bg-card-hover: rgba(30, 41, 59, 0.85);
+      --border-glow: rgba(56, 189, 248, 0.25);
+      --border-dim: rgba(255, 255, 255, 0.08);
+      --accent-blue: #38bdf8;
+      --accent-indigo: #818cf8;
+      --accent-rose: #fb7185;
+      --accent-emerald: #34d399;
+      --accent-amber: #fbbf24;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-deep);
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      line-height: 1.6;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 15% 20%, rgba(56, 189, 248, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 65%, rgba(129, 140, 248, 0.08) 0%, transparent 45%),
+        radial-gradient(circle at 50% 90%, rgba(251, 113, 133, 0.05) 0%, transparent 50%);
+      background-attachment: fixed;
+    }
+
+    /* Presentation Slide Deck Layout */
+    .deck-container {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 6rem;
+    }
+
+    /* Slide Card */
+    .slide-section {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-dim);
+      border-radius: 24px;
+      padding: 3rem 3.5rem;
+      margin-bottom: 3.5rem;
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .slide-section:hover {
+      border-color: var(--border-glow);
+      box-shadow: 0 25px 50px -12px rgba(56, 189, 248, 0.15);
+    }
+
+    .slide-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.9rem;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 100px;
+      color: var(--accent-blue);
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 1.25rem;
+    }
+
+    h1, h2, h3 {
+      font-weight: 800;
+      letter-spacing: -0.025em;
+    }
+
+    .slide-title {
+      font-size: 2.25rem;
+      color: #ffffff;
+      margin-bottom: 0.75rem;
+      line-height: 1.2;
+    }
+
+    .slide-subtitle {
+      font-size: 1.15rem;
+      color: var(--accent-indigo);
+      margin-bottom: 2rem;
+      font-weight: 500;
+    }
+
+    /* Links & CTAs */
+    .cta-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      color: #fff;
+      box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(37, 99, 235, 0.6);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-dim);
+      color: var(--text-main);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
+    }
+
+    /* Card Grids */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .sub-card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-dim);
+      border-radius: 16px;
+      padding: 1.5rem;
+      transition: all 0.2s ease;
+    }
+
+    .sub-card:hover {
+      background: rgba(30, 41, 59, 0.7);
+      border-color: rgba(56, 189, 248, 0.3);
+      transform: translateY(-3px);
+    }
+
+    .sub-card h4 {
+      font-size: 1.1rem;
+      color: #fff;
+      margin-bottom: 0.6rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .sub-card p {
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      line-height: 1.55;
+    }
+
+    /* Tables */
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      margin-top: 1.5rem;
+      border-radius: 16px;
+      border: 1px solid var(--border-dim);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+
+    th {
+      background: rgba(30, 41, 59, 0.8);
+      color: #ffffff;
+      padding: 1rem 1.25rem;
+      font-weight: 700;
+      border-bottom: 1px solid var(--border-dim);
+    }
+
+    td {
+      padding: 1rem 1.25rem;
+      color: var(--text-muted);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background: rgba(56, 189, 248, 0.04);
+      color: var(--text-main);
+    }
+
+    /* Highlights and Code */
+    .highlight-stat {
+      color: var(--accent-emerald);
+      font-weight: 700;
+    }
+
+    .highlight-breach {
+      color: var(--accent-rose);
+      font-weight: 700;
+    }
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85em;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 0.2rem 0.4rem;
+      border-radius: 6px;
+      color: var(--accent-blue);
+    }
+
+    /* Mermaid diagrams container */
+    .diagram-box {
+      background: rgba(13, 17, 23, 0.8);
+      border: 1px solid var(--border-dim);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Header Nav */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(9, 13, 22, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-dim);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      font-weight: 800;
+      font-size: 1.1rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+    }
+
+    .logo span {
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-indigo));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .nav-link {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: color 0.2s;
+    }
+
+    .nav-link:hover {
+      color: #fff;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      padding: 3rem 1rem;
+      border-top: 1px solid var(--border-dim);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sticky Header -->
+  <header>
+    <a href="#" class="logo">
+      <span>FIRST MILESTONES</span> · Studio
+    </a>
+    <div class="nav-links">
+      <a href="#slide-1" class="nav-link">Overview</a>
+      <a href="#slide-2" class="nav-link">Team</a>
+      <a href="#slide-3" class="nav-link">Challenge</a>
+      <a href="#slide-4" class="nav-link">Agent</a>
+      <a href="#slide-5" class="nav-link">Data</a>
+      <a href="#slide-6" class="nav-link">Architecture</a>
+      <a href="https://early-intervention-triage-ny-584075988667.us-central1.run.app" target="_blank" class="btn btn-primary" style="padding: 0.4rem 1rem; font-size: 0.85rem;">Live App ↗</a>
+    </div>
+  </header>
+
+  <div class="deck-container">
+
+    <!-- SLIDE 1: Title & Hero -->
+    <section id="slide-1" class="slide-section">
+      <div class="slide-badge">Slide 1 · Hackathon Submission</div>
+      <h1 class="slide-title">First Milestones: IDEA Part C Early Intervention Triage</h1>
+      <p class="slide-subtitle">Beating the 45-Day Statutory Clock for Vulnerable Toddlers via BigQuery ISO GQL & Google ADK</p>
+      
+      <p style="color: var(--text-muted); font-size: 1.05rem; max-width: 850px; margin-bottom: 1.5rem;">
+        An intelligent multi-hop clinical routing and quarterly network-audit studio built for <b>Agents for Impact 2026 (Challenge 04)</b>. Deployed live on Cloud Run with full support for New York (Bronx County) and Mississippi.
+      </p>
+
+      <div class="grid-3">
+        <div class="sub-card">
+          <h4>🌐 Live Cloud Run Service</h4>
+          <p>Production container deployed in <code>us-central1</code> with Dark Obsidian Atelier UI and reactive Leaflet geospatial mapping.</p>
+          <a href="https://early-intervention-triage-ny-584075988667.us-central1.run.app" target="_blank" style="color: var(--accent-blue); font-size: 0.85rem; display: inline-block; margin-top: 0.5rem; font-weight: 600;">Open Cloud Run ↗</a>
+        </div>
+        <div class="sub-card">
+          <h4>⚡ Google ADK Multi-Agent</h4>
+          <p>Coordinated <code>root_agent</code>, <code>pathway_router_agent</code>, and <code>network_auditor_agent</code> running on Gemini 2.5 Flash.</p>
+        </div>
+        <div class="sub-card">
+          <h4>📊 BigQuery ISO GQL Graph</h4>
+          <p>Declared in native ISO/IEC 39075 GQL on Enterprise autoscaling reservation (<code>a4i-graph</code>) for multi-hop <code>-{2,4}-></code> path finding.</p>
+        </div>
+      </div>
+
+      <div class="cta-group">
+        <a href="https://early-intervention-triage-ny-584075988667.us-central1.run.app" target="_blank" class="btn btn-primary">
+          Launch Live App ↗
+        </a>
+        <a href="https://github.com/Sree-Hari-Priya/agents_for_impact" target="_blank" class="btn btn-secondary">
+          GitHub Repository
+        </a>
+        <a href="https://github.com/Sree-Hari-Priya/agents_for_impact/blob/main/First_Milestones_Pitch_Deck.pdf" target="_blank" class="btn btn-secondary">
+          Download PDF Deck
+        </a>
+        <a href="https://github.com/Sree-Hari-Priya/agents_for_impact/blob/main/First_Milestones_Pitch_Deck.pptx" target="_blank" class="btn btn-secondary">
+          Download PPTX
+        </a>
+      </div>
+    </section>
+
+    <!-- SLIDE 2: Our Team -->
+    <section id="slide-2" class="slide-section">
+      <div class="slide-badge">Slide 2 · Team Showcase</div>
+      <h2 class="slide-title">Our Team & Event Recognition</h2>
+      <p class="slide-subtitle">Project Roster, Official Team Picture & Filming Availability</p>
+
+      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 20px; padding: 2.5rem; text-align: center; margin-bottom: 2rem;">
+        <h3 style="font-size: 1.5rem; color: #fff; margin-bottom: 0.5rem;">FIRST MILESTONES PROJECT TEAM</h3>
+        <p style="color: var(--accent-blue); font-weight: 600; margin-bottom: 1.5rem;">Team Lead: Sree Hari Priya &nbsp;·&nbsp; Agents for Impact Team</p>
+
+        <a href="https://photos.google.com/photo/AF1QipMMHSDoYXfUEey-G92DeXZLErrHQjA_jP1IpuUi" target="_blank" class="btn btn-primary" style="font-size: 1.05rem; padding: 0.85rem 2rem; background: linear-gradient(135deg, #0b57d0, #0284c7);">
+          📸 View Official Team Photo on Google Photos ↗
+        </a>
+
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 1rem;">
+          Direct Google Photos URL: <code>https://photos.google.com/photo/AF1QipMMHSDoYXfUEey-G92DeXZLErrHQjA_jP1IpuUi</code>
+        </p>
+      </div>
+
+      <div class="grid-3">
+        <div class="sub-card">
+          <h4>🎬 Filming Availability</h4>
+          <p><b class="highlight-stat">CONFIRMED YES</b><br/>Available to return to Google Event Center (MP7) between 11:00 AM – 2:00 PM on Thursday 11/19.</p>
+        </div>
+        <div class="sub-card">
+          <h4>🤝 Project Sharing</h4>
+          <p><b class="highlight-stat">CONFIRMED YES</b><br/>Authorized for internal Google sharing and dissemination across colleagues and hackathon organizers.</p>
+        </div>
+        <div class="sub-card">
+          <h4>📢 Discord Notifications</h4>
+          <p><b class="highlight-stat">ACTIVE</b><br/>Actively monitoring hackathon Discord channels for winner announcements prior to 9:00 PM.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 3: Real-World Challenge -->
+    <section id="slide-3" class="slide-section">
+      <div class="slide-badge">Slide 3 · Problem Space</div>
+      <h2 class="slide-title">The 45-Day Statutory Clock Crisis</h2>
+      <p class="slide-subtitle">Federal IDEA Part C Mandate & The Flat SQL Waitlist Illusion</p>
+
+      <div class="diagram-box">
+        <div class="mermaid">
+graph LR
+    subgraph Flat_SQL_Trap [The Flat SQL Waitlist Illusion]
+        A["Pediatric Clinic<br/>(Referral Out)"] -->|Paper Fax| B["Coordinator Hub 012<br/>Wait: 5 Days (Looks Healthy)"]
+        B -->|Paper Fax| C["Eval Hub 008<br/>Wait: 32 Days (Queue Symptom)"]
+        C -->|Missing Spanish/Medicaid| D["Therapy Vendor 018<br/>Bounce Hop 3"]
+        D -->|Final IFSP| E["Total Elapsed: 75 Days<br/>❌ 45-Day Statutory Breach"]
+    end
+    style B fill:#3b0764,stroke:#a855f7,stroke-width:2px
+    style E fill:#450a0a,stroke:#f43f5e,stroke-width:2px,color:#fff
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="sub-card">
+          <h4>⚖️ Federal Mandate (34 CFR § 303.310)</h4>
+          <p>States have strictly <b>45 calendar days</b> from referral to evaluate an infant and deliver an Individualized Family Service Plan (IFSP). Early intervention at 20 months rewires neuroplasticity; waiting until kindergarten misses critical developmental windows.</p>
+        </div>
+        <div class="sub-card">
+          <h4>⏳ 36-Month Age-Out Cliff</h4>
+          <p>Children permanently age out of IDEA Part C at 36 months (age 3). An administrative delay of 45+ days permanently disqualifies a 30-month-old from early intervention services with zero safety net.</p>
+        </div>
+        <div class="sub-card">
+          <h4>🔍 The Flat SQL Waitlist Illusion</h4>
+          <p>Standard SQL sorts providers by waitlist size. Backlogged evaluation centers (waitlist = 75) are merely downstream symptoms. The true drivers are low-wait <b>"Bounce Hubs"</b> whose fax handoffs trigger multi-hop failures.</p>
+        </div>
+        <div class="sub-card">
+          <h4>📉 Cascading Multi-Hop Breaches</h4>
+          <p>When Spanish-language credentials or Medicaid enrollment are missing, toddlers bounce 3 to 4 times—pushing elapsed time to <b>70–75 days</b>. High-poverty, zero-vehicle neighborhoods (e.g. Bronx NY: 73.2% zero-vehicle) suffer the worst delays.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 4: Our Agent -->
+    <section id="slide-4" class="slide-section">
+      <div class="slide-badge">Slide 4 · Solution</div>
+      <h2 class="slide-title">Our Agent — Conversational Multi-Hop Routing Assistant</h2>
+      <p class="slide-subtitle">Three Functional Tracks, Variable-Length ISO GQL & Measurable Clinical Impact</p>
+
+      <div class="grid-3">
+        <div class="sub-card">
+          <h4>🎯 Track 1: Active Triage</h4>
+          <p>Coordinator inputs an incoming toddler (e.g., 22-month-old Spanish-speaking Medicaid referral in Bronx tract <code>36005018900</code>). Agent routes through a verified compliant pathway in <b class="highlight-stat">22 days</b> (saving 53 days) while enforcing zero-vehicle transit limits.</p>
+        </div>
+        <div class="sub-card">
+          <h4>🔎 Track 2: Quarterly Network Audit</h4>
+          <p>Traverses variable-length ISO GQL paths (<code>-{2,4}-></code>) to expose hidden bounce hubs (like NY-012 & MS-011) that report deceptive 5-day queues yet cause 70+ day breaches across the region.</p>
+        </div>
+        <div class="sub-card">
+          <h4>📍 Track 3: Community Screening</h4>
+          <p>Combines Census ACS poverty, zero-vehicle data, and HRSA NSCH rates to place mobile screening clinics strictly where downstream <=45-day capacity is mathematically confirmed.</p>
+        </div>
+      </div>
+
+      <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 16px; padding: 1.5rem; margin-top: 1.5rem;">
+        <h4 style="color: var(--accent-emerald); margin-bottom: 0.5rem; font-size: 1.1rem;">🌟 Concrete Clinical Impact Proved by Counterfactual Simulation:</h4>
+        <p style="color: var(--text-main); font-size: 0.95rem;">
+          • <b class="highlight-stat">1,168 Child-Days Saved:</b> Replacing paper faxing with electronic intake at intermediary bounce hubs recovers 1,168 child-days across the network.<br/>
+          • <b class="highlight-stat">Age-Out Prevention:</b> Children aged 30+ months are automatically fast-tracked before falling off the 36-month eligibility cliff.<br/>
+          • <b class="highlight-stat">Compassionate Bilingual Caregiver Notes:</b> Produces plain-language English and Spanish action guides explaining next steps without clinical jargon.
+        </p>
+      </div>
+    </section>
+
+    <!-- SLIDE 5: Data Ecosystem -->
+    <section id="slide-5" class="slide-section">
+      <div class="slide-badge">Slide 5 · Data Spine</div>
+      <h2 class="slide-title">Data Ecosystem & BigQuery Property Graph</h2>
+      <p class="slide-subtitle">Curated Data Spine, Real Demographics, 100% Synthetic Providers & Ethical Firewalls</p>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Dataset</th>
+              <th>Source / Type</th>
+              <th>Grain & Scope</th>
+              <th>Role & Planted Trap Defense</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>acs_under5_tract_demographics</code></td>
+              <td>Real US Census Bureau (ACS 5-Year)</td>
+              <td>Census Tract (89 NY, 64 MS)</td>
+              <td>Under-5 counts, poverty rates, zero-vehicle household shares. <i>Trap Defense:</i> Bypassed all-zero <code>limited_english_rate</code> column.</td>
+            </tr>
+            <tr>
+              <td><code>nsch_developmental_screening_survey</code></td>
+              <td>Real HRSA MCHB Survey</td>
+              <td>Statewide (6 modeled strata)</td>
+              <td>Screening baselines (12.3% non-English rate). <i>Trap Defense:</i> Kept strictly at statewide grain to avoid 6x tract fan-out.</td>
+            </tr>
+            <tr>
+              <td><code>pediatric_and_ei_provider_directory</code></td>
+              <td>100% Synthetic (<code>SYN-PROV-*</code>)</td>
+              <td>CareNode Vertices (30 hubs)</td>
+              <td>Synthetic clinics, intake coordinators, and eval hubs ensuring no real clinicians are blamed for statutory violations.</td>
+            </tr>
+            <tr>
+              <td><code>deidentified_part_c_referral_logs</code></td>
+              <td>100% Synthetic</td>
+              <td>ReferralHandoff Edges (149 edges)</td>
+              <td>44 child referral chains (35 multi-hop, 26 breaching 45-day clock). Correlates <code>case_chain_id</code> across hops.</td>
+            </tr>
+            <tr>
+              <td><code>ReferralGraph</code> (ISO GQL)</td>
+              <td>BigQuery Property Graph</td>
+              <td>Native ISO/IEC 39075 GQL</td>
+              <td>Declared on Enterprise zero-baseline autoscaling reservation (<code>a4i-graph</code>) for multi-hop path analysis.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="background: rgba(251, 113, 133, 0.08); border: 1px solid rgba(251, 113, 133, 0.3); border-radius: 16px; padding: 1.25rem; margin-top: 1.5rem;">
+        <h4 style="color: var(--accent-rose); font-size: 0.95rem; margin-bottom: 0.3rem;">🛡️ Ethical Non-Discrimination Boundary</h4>
+        <p style="color: var(--text-muted); font-size: 0.88rem;">
+          Census tract race and ethnicity demographics (<code>audit_black_share</code>, <code>audit_hispanic_share</code>) are strictly firewalled from clinical routing algorithms. Clinical matching relies solely on clinical urgency, language capability, Medicaid acceptance, wait times, and travel distance. Demographics are analyzed strictly post-output in the Equity Audit.
+        </p>
+      </div>
+    </section>
+
+    <!-- SLIDE 6: Technical Blueprint -->
+    <section id="slide-6" class="slide-section">
+      <div class="slide-badge">Slide 6 · Architecture</div>
+      <h2 class="slide-title">Technical Build Blueprint</h2>
+      <p class="slide-subtitle">Multi-Agent System: Google ADK (Gemini 2.5 Flash), BigQuery ISO GQL & Cloud Run</p>
+
+      <div class="diagram-box">
+        <div class="mermaid">
+graph TD
+    User["Intake / Quality Coordinator"] --> UI["Cloud Run Studio Atelier<br/>(Vis.js Topological Graph & Side-by-Side SVG Clocks)"]
+    UI --> FastAPI["FastAPI Service (/api/triage/route, /api/graph/breaches, /api/audit/equity)"]
+    FastAPI --> ADK["Google ADK Orchestrator (gemini-2.5-flash)"]
+    
+    subgraph Multi_Agent_Chains [ADK Specialized Agents]
+        ADK --> RouterAgent["pathway_router_agent<br/>(<=45d Clinical Routing & Transit)"]
+        ADK --> AuditorAgent["network_auditor_agent<br/>(Bounce Hub & Equity Audit)"]
+    end
+    
+    subgraph Custom_Tools [Custom Python Tools]
+        RouterAgent --> Tool1["find_compliant_toddler_pathway()<br/>Medicaid + Spanish + ST_DISTANCE"]
+        RouterAgent --> Tool2["format_bilingual_caregiver_note()<br/>Plain-Language English/Spanish"]
+        AuditorAgent --> Tool3["trace_45day_breaches_and_bounce_hubs()<br/>ISO GQL MATCH (c)-[hops]->{2,4}(v)"]
+        AuditorAgent --> Tool4["run_equity_and_counterfactual_audit()<br/>1,168 Child-Days Saved Simulation"]
+    end
+    
+    subgraph Data_Layer [Google Cloud Data Engine]
+        Tool1 & Tool3 --> BQ["BigQuery Property Graph Engine<br/>(ISO/IEC 39075 GQL + 'a4i-graph' Reservation)"]
+        Tool4 --> BQMCP["BigQuery Built-in MCP Server<br/>(Analytical Aggregations & Parquet Fallback)"]
+    end
+    style UI fill:#0f172a,stroke:#38bdf8,stroke-width:2px
+    style ADK fill:#1e1b4b,stroke:#818cf8,stroke-width:2px
+    style BQ fill:#042f2e,stroke:#2dd4bf,stroke-width:2px
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="sub-card">
+          <h4>🎨 Dark Obsidian Glassmorphism Atelier</h4>
+          <p>Responsive web app featuring interactive Vis.js topological network inspector, side-by-side 45-day statutory clock comparison SVG, and working track switcher for New York and Mississippi.</p>
+        </div>
+        <div class="sub-card">
+          <h4>🤖 Google ADK Sequential Agent Flow</h4>
+          <p>Vertex AI <code>gemini-2.5-flash</code> orchestrates specialized sub-agents with strict tool grounding, zero hallucination, and full compliance reporting.</p>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <footer>
+    <p><b>First Milestones: IDEA Part C Early Intervention Triage & Network-Audit Studio</b></p>
+    <p>Agents for Impact 2026 · Challenge 04 Hackathon Submission</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="https://github.com/Sree-Hari-Priya/agents_for_impact" style="color: var(--accent-blue); text-decoration: none;">GitHub Repository</a> &nbsp;·&nbsp; 
+      <a href="https://early-intervention-triage-ny-584075988667.us-central1.run.app" style="color: var(--accent-blue); text-decoration: none;">Live Cloud Run App</a>
+    </p>
+  </footer>
+
+</body>
+</html>
