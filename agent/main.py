@@ -510,9 +510,11 @@ def index():
                 <a href="javascript:void(0)" class="badge bg-white text-primary border text-decoration-none" onclick="setGeoLocation('13617')">13617 (Canton)</a>
                 <a href="javascript:void(0)" class="badge bg-white text-primary border text-decoration-none" onclick="setGeoLocation('14701')">14701 (Jamestown)</a>
               </div>
-              <!-- Hidden underlying Census GEOID passed to routing algorithms -->
-              <input type="hidden" id="tractGeoid" value="36005019700">
-              <div id="geoResolvedText" class="small text-primary fw-semibold" style="font-size:0.78rem;">
+              <div class="mt-2">
+                <label class="form-label small fw-semibold mb-1" style="font-size:0.75rem;">Census Tract GEOID</label>
+                <input type="text" id="tractGeoid" class="form-control form-control-sm" value="36005019700" placeholder="e.g. 36005019700" onchange="runTriage()">
+              </div>
+              <div id="geoResolvedText" class="small text-primary fw-semibold mt-1" style="font-size:0.78rem;">
                 📍 Resolved: ZIP 10451 — Bronx (Mott Haven) · Tract 36005019700
               </div>
             </div>
