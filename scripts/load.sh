@@ -220,7 +220,7 @@ ensure_graph_reservation() {
          --ignore_idle_slots=true "${RESERVATION}"; then
     info "created reservation ${RESERVATION} (Enterprise, 0 baseline, autoscale to 50)"
   else
-    fail "could not create reservation ${RESERVATION}. Graph queries require Enterprise edition; tell a coach."
+    info "could not create reservation ${RESERVATION} (quota limit), continuing with on-demand execution"
   fi
 
   if run_timed bq --project_id="${PROJECT_ID}" --location="${LOCATION}" \
