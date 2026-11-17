@@ -959,50 +959,6 @@ I partner with you to ensure every infant and toddler reaches their developmenta
                 </div>
               </div>
             </div>
-
-            <!-- BigQuery Trace Telemetry Sub-Panel -->
-            <div class="card p-3 border shadow-xs" style="background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%); border-radius: 1.15rem;">
-              <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
-                <div>
-                  <h6 class="fw-bold mb-0 text-dark d-flex align-items-center">
-                    <i class="fa-solid fa-database text-primary me-2"></i>BigQuery Trace Audit Log
-                    <code class="ms-2 small text-secondary" style="font-size: 0.75rem;">qwiklabs-gcp-03-4b836a7f2e04.a4i_early_intervention.triage_agent_execution_traces</code>
-                  </h6>
-                  <span class="text-muted small" style="font-size: 0.74rem;">
-                    Every multi-agent execution event, parameter, and latency measurement is streamed directly into BigQuery for compliance auditing.
-                  </span>
-                </div>
-                <div class="d-flex gap-2">
-                  <button type="button" class="btn btn-sm btn-outline-primary fw-semibold" onclick="loadRecentTraces()">
-                    <i class="fa-solid fa-arrows-rotate me-1"></i> Refresh BigQuery Traces
-                  </button>
-                </div>
-              </div>
-
-              <!-- Traces Table -->
-              <div class="table-responsive rounded border bg-white" style="max-height: 260px; overflow-y: auto;">
-                <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.76rem;">
-                  <thead class="table-light sticky-top">
-                    <tr>
-                      <th scope="col" style="min-width: 130px;">Timestamp (UTC)</th>
-                      <th scope="col" style="min-width: 100px;">Trace ID</th>
-                      <th scope="col" style="min-width: 160px;">Agent</th>
-                      <th scope="col" style="min-width: 150px;">Event Type</th>
-                      <th scope="col" style="min-width: 90px;">Status</th>
-                      <th scope="col" style="min-width: 80px;">Latency</th>
-                      <th scope="col">Decision Details Payload</th>
-                    </tr>
-                  </thead>
-                  <tbody id="bqTracesTableBody">
-                    <tr>
-                      <td colspan="7" class="text-center text-muted py-3">
-                        <i class="fa-solid fa-spinner fa-spin me-1"></i> Loading BigQuery execution traces...
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -1509,7 +1465,6 @@ I partner with you to ensure every infant and toddler reaches their developmenta
       setActiveState('NY');
       // Initialize Track 1 location resolution and triage route
       resolveLocationNow();
-      loadRecentTraces();
     });
 
     let svgCurrentMode = "both";
@@ -2261,11 +2216,10 @@ I partner with you to ensure every infant and toddler reaches their developmenta
           `;
         }
 
-        // Update Multi-Agent Execution Breakdown & Refresh BigQuery Traces
+        // Update Multi-Agent Execution Breakdown
         if (data.agent_breakdown) {
           renderAgentExecutionBreakdown(data.agent_breakdown, data.trace_id);
         }
-        loadRecentTraces();
       } catch (err) {
         resultDiv.innerHTML = `<span class="text-danger">Routing failed: ${err.message}</span>`;
       }
@@ -2383,69 +2337,7 @@ I partner with you to ensure every infant and toddler reaches their developmenta
       }
     }
 
-    async function loadRecentTraces() {
-      const tbody = document.getElementById('bqTracesTableBody');
-      if (!tbody) return;
-      try {
-        const res = await fetch('/api/traces/recent?limit=15');
-        const data = await res.json();
-        const traces = data.traces || [];
-        if (traces.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No BigQuery traces logged yet. Click "Calculate Compliant Pathway" to stream live traces.</td></tr>';
-          return;
-        }
-        let html = '';
-        for (const t of traces) {
-          let timeFormatted = 'Just now';
-          if (t.timestamp) {
-            try {
-              const d = new Date(t.timestamp);
-              timeFormatted = d.toISOString().replace('T', ' ').substring(11, 19) + ' UTC';
-            } catch (e) {
-              timeFormatted = String(t.timestamp).substring(11, 19);
-            }
-          }
-          const isSuccess = t.status === 'SUCCESS' || t.status === 'COMPLETED';
-          const isWarning = t.status === 'WARNING';
-          const statusBadge = isSuccess
-            ? '<span class="badge bg-success-subtle text-success border border-success-subtle">SUCCESS</span>'
-            : (isWarning
-                ? '<span class="badge bg-warning-subtle text-warning border border-warning-subtle">WARNING</span>'
-                : `<span class="badge bg-danger-subtle text-danger border border-danger-subtle">${t.status}</span>`);
-
-          let agentColor = 'text-primary';
-          if (t.agent_name === 'network_audit_agent') agentColor = 'text-warning-emphasis';
-          else if (t.agent_name === 'equity_audit_agent') agentColor = 'text-info';
-          else if (t.agent_name === 'caregiver_note_agent') agentColor = 'text-purple';
-          else if (t.agent_name === 'milestone_navigator_agent') agentColor = 'text-danger';
-
-          let detailsShort = '';
-          try {
-            const parsed = typeof t.details_json === 'string' ? JSON.parse(t.details_json) : t.details_json;
-            detailsShort = JSON.stringify(parsed);
-            if (detailsShort.length > 80) detailsShort = detailsShort.substring(0, 80) + '...';
-          } catch (e) {
-            detailsShort = String(t.details_json || '').substring(0, 80);
-          }
-
-          html += `
-            <tr>
-              <td class="text-nowrap text-secondary font-monospace" style="font-size:0.72rem;">${timeFormatted}</td>
-              <td><code class="font-monospace text-dark fw-bold" style="font-size:0.72rem;" title="${escapeHtml(t.trace_id)}">${(t.trace_id || '').substring(0, 8)}...</code></td>
-              <td class="fw-semibold ${agentColor}"><i class="fa-solid fa-microchip me-1"></i>${t.agent_name}</td>
-              <td><span class="badge bg-light text-dark border font-monospace" style="font-size:0.68rem;">${t.event_type}</span></td>
-              <td>${statusBadge}</td>
-              <td class="text-secondary font-monospace">${t.latency_ms !== null && t.latency_ms !== undefined ? t.latency_ms + 'ms' : '-'}</td>
-              <td class="text-muted text-truncate font-monospace" style="max-width: 280px; font-size: 0.72rem;" title="${escapeHtml(t.details_json || '')}">${escapeHtml(detailsShort)}</td>
-            </tr>
-          `;
-        }
-        tbody.innerHTML = html;
-      } catch (err) {
-        console.error('Failed to load recent traces:', err);
-        tbody.innerHTML = `<tr><td colspan="7" class="text-danger text-center py-2">Error connecting to BigQuery traces: ${err.message}</td></tr>`;
-      }
-    }
+    // BigQuery traces are logged directly on the backend during multi-agent triage execution.
 
     async function showCaregiverModal() {
       const p = window.currentTriagePathway;
