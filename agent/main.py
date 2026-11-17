@@ -22,6 +22,7 @@ from agent.tools import (
     run_equity_and_counterfactual_audit,
     format_bilingual_caregiver_note,
     get_state_geospatial_graph_data,
+    simulate_single_network_fix,
 )
 from google.adk import Runner
 from google.adk.sessions import InMemorySessionService
@@ -103,6 +104,10 @@ def equity_audit():
 @app.get("/api/graph/map")
 def get_map_graph(state_code: str = "NY"):
     return get_state_geospatial_graph_data(state_code=state_code)
+
+@app.get("/api/network/simulate")
+def simulate_network_fix(coordinator_id: Optional[str] = None, state_code: Optional[str] = "MS"):
+    return simulate_single_network_fix(coordinator_id=coordinator_id, state_code=state_code)
 
 @app.get("/", response_class=HTMLResponse)
 def index():
@@ -270,6 +275,9 @@ def index():
             <button id="btnTrack3" type="button" class="btn btn-sm btn-outline-light track-nav-btn" onclick="activateTrack(3)">
               <i class="fa-solid fa-van-shuttle me-1"></i> Track 3: Outreach Season
             </button>
+            <button id="btnTrack4" type="button" class="btn btn-sm btn-outline-light fw-semibold" onclick="activateTrack(4)">
+              🛠️ Track 4: Single Network Fix Simulator
+            </button>
           </div>
         </div>
         <div id="trackBannerInfo" class="small text-white bg-white bg-opacity-10 px-3 py-1 rounded-pill">
@@ -377,6 +385,7 @@ def index():
 
 I can help you resolve today's intake bottlenecks immediately:
 • <strong>Compliant Routing:</strong> "Route a 22-month-old Spanish-speaking Medicaid toddler near tract 36005019700."
+• <strong>Network Fix Simulation:</strong> "Simulate network fix: how many breached cases drop under 45 days if Indianola intake coordinator switches to electronic intake with pre-checked bilingual slots?"
 • <strong>Caregiver Notes:</strong> "Generate bilingual caregiver action notes for the Rivera family and toddler Mateo."
 • <strong>Transit Check:</strong> "Does tract 28083950200 trigger the zero-vehicle transit guardrail?"</div>
             </div>
@@ -614,69 +623,151 @@ I can help you resolve today's intake bottlenecks immediately:
         </div>
       </div>
     </div>
+
+    <!-- Interactive Single Network Fix Simulator (Challenge Requirement) -->
+    <div class="row mt-2">
+      <div class="col-12">
+        <div class="card p-4 border-primary">
+          <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+            <div>
+              <span class="badge bg-primary text-white mb-1">Graph Counterfactual Intervention</span>
+              <h5 class="card-title mb-1">🛠️ Simulate Single Network Fix: Paper Fax &rarr; Electronic EHR Intake + Bilingual Pre-Check</h5>
+              <p class="text-muted small mb-0">
+                Compute exactly how many breached referral cases drop under the 45-day statutory limit if a regional Part C coordinator switches to electronic intake with pre-checked bilingual evaluator slots.
+              </p>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <select id="simCoordSelect" class="form-select form-select-sm" style="width: auto;">
+                <option value="SYN-PROV-MS-011" selected>Indianola Regional Desk (SYN-PROV-MS-011)</option>
+                <option value="SYN-PROV-MS-012">Jackson Regional Desk (SYN-PROV-MS-012)</option>
+                <option value="SYN-PROV-MS-010">Greenville Regional Desk (SYN-PROV-MS-010)</option>
+                <option value="SYN-PROV-MS-009">Cleveland Regional Desk (SYN-PROV-MS-009)</option>
+              </select>
+              <button class="btn btn-primary btn-sm" onclick="runNetworkSimulation()">Run Graph Simulation</button>
+            </div>
+          </div>
+
+          <div id="simResultsArea" class="p-3 bg-light rounded border">
+            <!-- Executive Summary Alert Banner -->
+            <div class="alert alert-success d-flex align-items-center mb-3 p-3">
+              <div class="fs-3 me-3">🎯</div>
+              <div>
+                <h6 class="alert-heading mb-1 fw-bold">Network Fix Simulation Summary: Indianola Regional Intake Desk (SYN-PROV-MS-011)</h6>
+                <div id="simExecutiveSummary" class="small mb-0">
+                  Switching <strong>Indianola Regional Part C Intake Desk</strong> from <code>paper_fax</code> to <strong>electronic EHR intake</strong> with <strong>pre-checked bilingual evaluator slots</strong> rescues <strong>6 of 7 breached referral chains (85.7%)</strong> directly under the 45-day federal IFSP statutory limit. Average referral latency drops from <strong>74.3 days down to 36.3 days</strong>, slashing <strong>246 delayed child-days</strong> and decreasing statewide breaches by <strong>23.1% (from 26 down to 20)</strong>.
+                </div>
+              </div>
+            </div>
+
+            <div class="row g-3 text-center mb-3">
+              <div class="col-md-3">
+                <div class="p-3 bg-white rounded border shadow-sm">
+                  <div class="text-muted small text-uppercase fw-semibold">Coordinator Breaches</div>
+                  <div id="simStatOrig" class="fw-bold text-danger fs-4 mt-1">7 Cases (&gt;45d)</div>
+                  <div class="small text-muted">Baseline Fax Latency ~74.3d</div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="p-3 bg-white rounded border shadow-sm">
+                  <div class="text-muted small text-uppercase fw-semibold">Cases Dropped &le;45d</div>
+                  <div id="simStatRescued" class="fw-bold text-success fs-4 mt-1">6 Rescued (&le;45d)</div>
+                  <div class="small text-success fw-bold">85.7% Hub Recovery Rate</div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="p-3 bg-white rounded border shadow-sm">
+                  <div class="text-muted small text-uppercase fw-semibold">Statewide Impact</div>
+                  <div id="simStatState" class="fw-bold text-primary fs-4 mt-1">26 &rarr; 20 (-23.1%)</div>
+                  <div class="small text-muted">Across 44 Multi-Hop Chains</div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="p-3 bg-white rounded border shadow-sm">
+                  <div class="text-muted small text-uppercase fw-semibold">Delayed Child-Days Saved</div>
+                  <div id="simStatDays" class="fw-bold text-success fs-4 mt-1">246 Child-Days</div>
+                  <div class="small text-muted">Slashing Wait from 74.3d to 36.3d</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mechanism Explanation -->
+            <div class="card p-3 mb-3 border-0 bg-white shadow-sm">
+              <h6 class="fw-bold mb-2 text-dark">🔍 Counterfactual Mechanism: How One Fix Solves Breaches</h6>
+              <div class="small text-muted">
+                <ol class="mb-0 ps-3">
+                  <li><strong>Hop 1 Channel Upgrade:</strong> Upgrades the initial clinic handoff from slow paper fax (14 days) to direct EHR push (~6-7 days), reclaiming a week upfront.</li>
+                  <li><strong>Bilingual Pre-Check Elimination:</strong> The coordinator no longer bounces the referral into a monolingual evaluation center (which triggered an extra 31–38 day handoff loop). The child is routed directly to a verified bilingual evaluator.</li>
+                  <li><strong>36-Month Cliff Protection:</strong> Prevents older toddlers (28–32 months) from irreversibly aging out of Part C coverage during administrative ping-pong handoffs.</li>
+                </ol>
+              </div>
+            </div>
+
+            <!-- Hub Comparison Table -->
+            <h6 class="fw-bold mb-2">📋 Comparative Simulation Across Regional Intake Coordinators</h6>
+            <div class="table-responsive">
+              <table class="table table-sm table-hover align-middle mb-2 bg-white">
+                <thead class="table-light">
+                  <tr>
+                    <th>Coordinator Desk</th>
+                    <th>Breached Chains</th>
+                    <th>Rescued (&le;45d)</th>
+                    <th>Residual Breaches</th>
+                    <th>Child-Days Saved</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="simRankingTbody">
+                  <tr>
+                    <td><strong>Jackson Regional Intake Desk (SYN-PROV-MS-012)</strong></td>
+                    <td><span class="badge bg-danger">7 cases</span></td>
+                    <td><span class="badge bg-success">7 cases dropped &le;45d</span></td>
+                    <td>0 residual cases</td>
+                    <td><span class="text-success fw-bold">246 days</span></td>
+                    <td><button class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="simulateHub('SYN-PROV-MS-012')">Simulate</button></td>
+                  </tr>
+                  <tr class="table-primary">
+                    <td><strong>Indianola Regional Intake Desk (SYN-PROV-MS-011)</strong></td>
+                    <td><span class="badge bg-danger">7 cases</span></td>
+                    <td><span class="badge bg-success">6 cases dropped &le;45d</span></td>
+                    <td>1 residual case</td>
+                    <td><span class="text-success fw-bold">246 days</span></td>
+                    <td><span class="badge bg-primary">Active Target</span></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Greenville Regional Intake Desk (SYN-PROV-MS-010)</strong></td>
+                    <td><span class="badge bg-danger">6 cases</span></td>
+                    <td><span class="badge bg-success">6 cases dropped &le;45d</span></td>
+                    <td>0 residual cases</td>
+                    <td><span class="text-success fw-bold">208 days</span></td>
+                    <td><button class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="simulateHub('SYN-PROV-MS-010')">Simulate</button></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Cleveland Regional Intake Desk (SYN-PROV-MS-009)</strong></td>
+                    <td><span class="badge bg-danger">6 cases</span></td>
+                    <td><span class="badge bg-success">4 cases dropped &le;45d</span></td>
+                    <td>2 residual cases</td>
+                    <td><span class="text-success fw-bold">208 days</span></td>
+                    <td><button class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="simulateHub('SYN-PROV-MS-009')">Simulate</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div id="simSummaryText" class="small text-muted mt-2">
+              <strong>Outcome:</strong> Switching coordinator Indianola Regional Part C Intake &amp; Service Coordination Desk #11 (SYN-PROV-MS-011) to electronic intake with pre-checked bilingual slots immediately rescues 6 of its 7 breached chains under the 45-day federal IFSP statutory limit, saving 246 total delayed child-days.
+            </div>
+          </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
     let sessionId = null;
     let activeState = "NY";
 
-    const STATE_DATA = {
-      NY: {
-        name: "New York (NY)",
-        county: "Bronx County",
-        tract: "36005019700",
-        nodes: [
-          { id: "SYN-PROV-NY-007", short: "NY-007 (Lockport Clinic)", wait: 6, x: 75, y: 115, color: "#38bdf8" },
-          { id: "SYN-PROV-NY-011", short: "NY-011 (Walton Bounce Hub)", wait: 5, x: 265, y: 115, color: "#f59e0b", bounceHub: true },
-          { id: "SYN-PROV-NY-015", short: "NY-015 (Canton Saturated)", wait: 34, x: 470, y: 52, color: "#ef4444" },
-          { id: "SYN-PROV-NY-019", short: "NY-019 (Lockport Bilingual)", wait: 7, x: 470, y: 145, color: "#a855f7" },
-          { id: "SYN-PROV-NY-028", short: "NY-028 (Malone Therapy)", wait: 6, x: 675, y: 52, color: "#10b981" },
-          { id: "SYN-PROV-NY-027", short: "NY-027 (Canton Therapy)", wait: 10, x: 675, y: 145, color: "#10b981" },
-          { id: "SYN-PROV-NY-026", short: "NY-026 (Jamestown Therapy)", wait: 8, x: 675, y: 205, color: "#10b981" }
-        ],
-        paths: {
-          bounce: {
-            id: "CHAIN-NY-023",
-            title: "🚨 CHAIN-NY-023: 4-Hop Paper-Fax Bounce (70 Days — Breaches 45d Limit!)",
-            subtitle: "32-month-old toddler (4 mos from 36m Part C aging-out cliff!) • Autism/Speech Screen",
-            total: 70,
-            color: "#ef4444",
-            edges: [
-              { from: "SYN-PROV-NY-007", to: "SYN-PROV-NY-011", hop: 1, days: 12, chan: "paper_fax", dy: -12 },
-              { from: "SYN-PROV-NY-011", to: "SYN-PROV-NY-015", hop: 2, days: 20, chan: "paper_fax", dy: -8 },
-              { from: "SYN-PROV-NY-015", to: "SYN-PROV-NY-019", hop: 3, days: 22, chan: "paper_fax", dy: 0 },
-              { from: "SYN-PROV-NY-019", to: "SYN-PROV-NY-028", hop: 4, days: 16, chan: "ehr_portal", dy: -8 }
-            ]
-          },
-          eval: {
-            id: "CHAIN-NY-007",
-            title: "✅ CHAIN-NY-007: 3-Hop Electronic Bilingual Route (40 Days — Saves 30 Days!)",
-            subtitle: "Same Clinic (NY-007) & Same Coordinator (NY-011), routed via EHR directly to NY-019",
-            total: 40,
-            color: "#22c55e",
-            edges: [
-              { from: "SYN-PROV-NY-007", to: "SYN-PROV-NY-011", hop: 1, days: 9, chan: "ehr_portal", dy: 14 },
-              { from: "SYN-PROV-NY-011", to: "SYN-PROV-NY-019", hop: 2, days: 14, chan: "ehr_portal", dy: 10 },
-              { from: "SYN-PROV-NY-019", to: "SYN-PROV-NY-027", hop: 3, days: 17, chan: "ehr_portal", dy: 10 }
-            ]
-          },
-          fast: {
-            id: "CHAIN-NY-031",
-            title: "⚡ CHAIN-NY-031: 2-Hop Electronic Fast-Track (22 Days — Saves 48 Days!)",
-            subtitle: "Direct Fast-Track IFSP Placement for eligible NY toddlers via EHR Portal",
-            total: 22,
-            color: "#38bdf8",
-            edges: [
-              { from: "SYN-PROV-NY-007", to: "SYN-PROV-NY-011", hop: 1, days: 8, chan: "ehr_portal", dy: 18 },
-              { from: "SYN-PROV-NY-011", to: "SYN-PROV-NY-026", hop: 2, days: 14, chan: "ehr_portal", dy: 14 }
-            ]
-          }
-        },
-        hubs: [
-          { name: "Walton Regional Intake Desk (SYN-PROV-NY-011)", wait: "5 days", list: 24, fax: "5 handoffs", breaches: "7 breaches (70+ days)", note: "Hidden bottleneck; low waitlist conceals paper-fax dropoffs." },
-          { name: "Bronx Regional Intake Desk (SYN-PROV-NY-012)", wait: "6 days", list: 29, fax: "5 handoffs", breaches: "7 breaches (70+ days)", note: "Urban high-volume re-referral hub with paper-fax delays." },
-          { name: "Canton Regional Intake Desk (SYN-PROV-NY-009)", wait: "8 days", list: 14, fax: "4 handoffs", breaches: "6 breaches (70+ days)", note: "North Country cross-county bounces into backlogged eval hubs." }
-        ]
+    const STATE_DATA = {        ]
       },
       MS: {
         name: "Mississippi (MS)",
@@ -772,15 +863,17 @@ I can help you resolve today's intake bottlenecks immediately:
 
     function activateTrack(trackNum) {
       // Toggle button active states
-      for (let i = 1; i <= 3; i++) {
+      for (let i = 1; i <= 4; i++) {
         const btn = document.getElementById('btnTrack' + i);
         const pane = document.getElementById('trackPane' + i);
-        if (i === trackNum) {
-          btn.className = 'btn btn-sm btn-light track-nav-btn active';
-          pane.classList.add('active');
-        } else {
-          btn.className = 'btn btn-sm btn-outline-light track-nav-btn';
-          pane.classList.remove('active');
+        if (btn) {
+          if (i === trackNum) {
+            btn.className = 'btn btn-sm btn-light track-nav-btn active';
+            if (pane) pane.classList.add('active');
+          } else {
+            btn.className = 'btn btn-sm btn-outline-light track-nav-btn';
+            if (pane) pane.classList.remove('active');
+          }
         }
       }
 
@@ -800,6 +893,11 @@ I can help you resolve today's intake bottlenecks immediately:
         info.innerHTML = "<strong>Track 3 Active:</strong> Combine ACS under-5 poverty & NSCH screening baselines to deploy mobile screening days.";
         input.value = `Where should community developmental screening outreach days go first in ${cfg.name}?`;
         loadEquityAuditData();
+      } else if (trackNum === 4) {
+        info.innerHTML = "<strong>Track 4 Active:</strong> Graph Simulation — Compute how many breached cases drop &le;45d when converting one paper-fax coordinator to electronic intake + bilingual pre-checking.";
+        input.value = "Simulate network fix: how many breached cases drop under 45 days if Indianola intake coordinator switches to electronic intake with pre-checked bilingual slots?";
+        const simEl = document.getElementById('simResultsArea');
+        if (simEl) simEl.scrollIntoView({ behavior: 'smooth' });
       }
     }
 
@@ -1164,6 +1262,58 @@ I can help you resolve today's intake bottlenecks immediately:
         }
       } catch (err) {
         console.warn('Could not load dynamic equity audit rows:', err);
+      }
+    }
+
+    async function runNetworkSimulation() {
+      const coordId = document.getElementById('simCoordSelect').value;
+      await simulateHub(coordId);
+    }
+
+    async function simulateHub(coordId) {
+      document.getElementById('simCoordSelect').value = coordId;
+      document.getElementById('simSummaryText').innerHTML = '<em>Running graph simulation over referral chains...</em>';
+
+      try {
+        const res = await fetch(`/api/network/simulate?coordinator_id=${encodeURIComponent(coordId)}&state_code=MS`);
+        const data = await res.json();
+        if (data.status === 'success') {
+          const t = data.target_coordinator;
+          const pct = Math.round((t.breached_cases_dropped_under_45d / (t.originally_breached_chains || 1)) * 100);
+          const execBanner = document.getElementById('simExecutiveSummary');
+          if (execBanner) {
+            execBanner.innerHTML = `Switching <strong>${t.coordinator_name}</strong> from <code>paper_fax</code> to <strong>electronic EHR intake</strong> with <strong>pre-checked bilingual evaluator slots</strong> rescues <strong>${t.breached_cases_dropped_under_45d} of ${t.originally_breached_chains} breached referral chains (${pct}%)</strong> directly under the 45-day federal IFSP statutory limit, saving <strong>${t.total_child_days_saved} delayed child-days</strong> and shifting statewide breaches ${t.statewide_breach_drop}.`;
+          }
+          document.getElementById('simStatOrig').innerText = `${t.originally_breached_chains} Cases (>45d)`;
+          document.getElementById('simStatRescued').innerText = `${t.breached_cases_dropped_under_45d} Rescued (<=45d)`;
+          document.getElementById('simStatState').innerText = t.statewide_breach_drop;
+          document.getElementById('simStatDays').innerText = `${t.total_child_days_saved} Child-Days`;
+          document.getElementById('simSummaryText').innerHTML = `<strong>Outcome:</strong> ${data.key_takeaway}`;
+
+          const tbody = document.getElementById('simRankingTbody');
+          if (data.all_coordinators_simulation_ranking) {
+            tbody.innerHTML = data.all_coordinators_simulation_ranking.map(r => {
+              const isTarget = r.coordinator_id === coordId;
+              const residual = r.originally_breached - r.breaches_dropped_under_45d;
+              return `
+                <tr class="${isTarget ? 'table-primary' : ''}">
+                  <td><strong>${r.coordinator_name}</strong></td>
+                  <td><span class="badge bg-danger">${r.originally_breached} cases</span></td>
+                  <td><span class="badge bg-success">${r.breaches_dropped_under_45d} cases dropped &le;45d</span></td>
+                  <td>${residual} residual case${residual === 1 ? '' : 's'}</td>
+                  <td><span class="text-success fw-bold">${r.child_days_saved} days</span></td>
+                  <td>
+                    ${isTarget ? '<span class="badge bg-primary">Active Target</span>' : `<button class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="simulateHub('${r.coordinator_id}')">Simulate</button>`}
+                  </td>
+                </tr>
+              `;
+            }).join('');
+          }
+        }
+      } catch (err) {
+        document.getElementById('simSummaryText').innerHTML = `<span class="text-danger">Simulation failed: ${err.message}</span>`;
+      }
+    }
       }
     }
   </script>

@@ -5,6 +5,7 @@ from agent.tools import (
     find_compliant_toddler_pathway,
     run_equity_and_counterfactual_audit,
     format_bilingual_caregiver_note,
+    simulate_single_network_fix,
 )
 def _build_optional_bq_toolset(default_dataset_id: str) -> list:
     """Attach ADK BigQueryToolset when Google Cloud ADC credentials are active."""
@@ -60,6 +61,7 @@ CRITICAL TECHNICAL GUARDRAILS & TRAPS AWARENESS:
 
 AVAILABLE TOOLS:
 - `trace_45day_breaches_and_bounce_hubs`: Executes variable-length ISO GQL traversal over BigQuery Property Graph (ReferralGraph) to find multi-hop chains breaching 45 days and identify bounce hubs.
+- `simulate_single_network_fix`: Simulates a targeted network fix: computes exactly how many breached cases drop under the 45-day federal clock if one paper_fax intake coordinator switches to electronic intake with pre-checked bilingual availability.
 - `find_compliant_toddler_pathway`: Discovers compliant <=45-day pathways (Clinic -> Coordinator -> Eval Hub -> Vendor) honoring Medicaid, bilingual services, and spatial travel distance.
 - `run_equity_and_counterfactual_audit`: Conducts a post-output Equity Audit joining child home tracts with ACS poverty/vehicle rates and calculates child-days saved by eliminating paper faxing.
 - `format_bilingual_caregiver_note`: Creates respectful, plain-language English and Spanish action notes for families.
@@ -76,6 +78,17 @@ pathway_router_agent = Agent(
         "to select a compliant <=45-day pathway and contrast it against regional paper-fax bounce hubs."
     ),
     tools=[find_compliant_toddler_pathway, trace_45day_breaches_and_bounce_hubs],
+)
+
+network_audit_agent = Agent(
+    model=MODEL_NAME,
+    name="network_audit_agent",
+    description="Simulates network fixes and audits bottleneck bounce hubs.",
+    instruction=(
+        "Use `simulate_single_network_fix` and `trace_45day_breaches_and_bounce_hubs` "
+        "to compute how many breached cases drop under 45 days when a paper-fax coordinator switches to electronic intake."
+    ),
+    tools=[simulate_single_network_fix, trace_45day_breaches_and_bounce_hubs],
 )
 
 equity_audit_agent = Agent(
@@ -103,7 +116,7 @@ caregiver_note_agent = Agent(
 brief_generator_pipeline = SequentialAgent(
     name="brief_generator_pipeline",
     description="End-to-end SequentialAgent generating the 45-Day Pathway & Bottleneck Brief.",
-    sub_agents=[pathway_router_agent, equity_audit_agent, caregiver_note_agent],
+    sub_agents=[pathway_router_agent, network_audit_agent, equity_audit_agent, caregiver_note_agent],
 )
 
 root_agent = Agent(
@@ -115,6 +128,7 @@ root_agent = Agent(
         _build_optional_bq_toolset(default_dataset_id=DATASET_ID)
         + [
             trace_45day_breaches_and_bounce_hubs,
+            simulate_single_network_fix,
             find_compliant_toddler_pathway,
             run_equity_and_counterfactual_audit,
             format_bilingual_caregiver_note,
