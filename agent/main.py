@@ -21,6 +21,7 @@ from agent.tools import (
     find_compliant_toddler_pathway,
     run_equity_and_counterfactual_audit,
     format_bilingual_caregiver_note,
+    get_state_geospatial_graph_data,
 )
 from google.adk import Runner
 from google.adk.sessions import InMemorySessionService
@@ -99,6 +100,10 @@ def triage_route(req: TriageRequest):
 def equity_audit():
     return run_equity_and_counterfactual_audit()
 
+@app.get("/api/graph/map")
+def get_map_graph(state_code: str = "NY"):
+    return get_state_geospatial_graph_data(state_code=state_code)
+
 @app.get("/", response_class=HTMLResponse)
 def index():
     html_content = """
@@ -110,6 +115,8 @@ def index():
   <title>First Milestones - Early Intervention Triage & Network Audit</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script type="text/javascript" src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     :root {
       --primary-color: #1a73e8;
@@ -567,6 +574,46 @@ I can help you resolve today's intake bottlenecks immediately:
         </div>
       </div>
     </div>
+
+    <!-- ========================================== -->
+    <!-- ALWAYS-ON GEOSPATIAL OVERLAY: PHYSICAL MAP OF NY + REFERRALGRAPH -->
+    <!-- ========================================== -->
+    <div class="row mt-4">
+      <div class="col-12">
+        <div class="card p-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+            <div>
+              <h5 id="mapCardTitle" class="card-title mb-1 fw-bold"><i class="fa-solid fa-earth-americas text-primary me-2"></i>Physical Map of New York (NY) — ReferralGraph &amp; 89 Census Tracts Overlay</h5>
+              <p class="text-muted small mb-0">
+                30 <code>CareNode</code> providers &amp; 89 real US Census tracts overlaid on <strong>USGS National Map (100% Public Domain US Gov — Zero OpenStreetMap ODbL)</strong>. Shows how a Bronx referral bounces hundreds of miles upstate when local bilingual slots saturate.
+              </p>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+              <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn btn-outline-primary" onclick="zoomMapRegion('state')">🗺️ Full State View</button>
+                <button type="button" class="btn btn-outline-primary" onclick="zoomMapRegion('bronx')">🏙️ Bronx / NYC Cluster</button>
+                <button type="button" class="btn btn-outline-primary" onclick="zoomMapRegion('catskills')">⛰️ Catskills / Upstate Eval</button>
+                <button type="button" class="btn btn-outline-secondary" onclick="toggleTractLayer()">📍 Toggle 89 Tracts</button>
+              </div>
+            </div>
+          </div>
+          <div id="nyPhysicalMap" style="height: 460px; width: 100%; border-radius: 0.75rem; border: 1px solid #cbd5e1;"></div>
+          <div class="d-flex flex-wrap justify-content-between align-items-center mt-2 small text-muted">
+            <div>
+              <span class="badge" style="background:#38bdf8; color:#0f172a;">●</span> Screening Clinic (8)
+              <span class="badge ms-1" style="background:#f59e0b; color:#0f172a;">●</span> Part C Intake Coordinator / Bounce Hub (4)
+              <span class="badge ms-1" style="background:#a855f7; color:#fff;">●</span> Multidisciplinary Eval Hub (8)
+              <span class="badge ms-1" style="background:#10b981; color:#0f172a;">●</span> EI Therapy Vendor (10)
+              <span class="badge ms-1" style="background:#f43f5e; color:#fff;">○</span> High Zero-Vehicle Tract
+            </div>
+            <div class="font-monospace">
+              <span style="color:#ef4444; font-weight:bold;">━━━ 4-Hop Fax Bounce (70d)</span> &nbsp;|&nbsp;
+              <span style="color:#22c55e; font-weight:bold;">━━━ &le;45d E-Referral Route (40d / 22d)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -715,7 +762,12 @@ I can help you resolve today's intake bottlenecks immediately:
         </tr>
       `).join('');
       document.getElementById('trackBannerInfo').innerHTML = `Ready to route a 20-month-old Spanish-speaking Medicaid referral in ${cfg.county}, ${st} (Tract ${cfg.tract}).`;
+      const mapTitle = document.getElementById('mapCardTitle');
+      if (mapTitle) {
+        mapTitle.innerHTML = `<i class="fa-solid fa-earth-americas text-primary me-2"></i>Physical Map of ${cfg.name} — ReferralGraph &amp; Census Tracts Overlay`;
+      }
       renderSvgComparisonGraph();
+      loadStatePhysicalMap(st);
     }
 
     function activateTrack(trackNum) {
@@ -766,6 +818,157 @@ I can help you resolve today's intake bottlenecks immediately:
         btn.classList.toggle("active", m === mode);
       });
       renderSvgComparisonGraph();
+      renderPhysicalMapOverlay();
+    }
+
+    let leafletMap = null;
+    let mapGraphLayer = null;
+    let mapTractLayer = null;
+    let mapStateData = null;
+    let showTractsOnMap = true;
+
+    function initPhysicalMap() {
+      if (leafletMap) return;
+      const el = document.getElementById('nyPhysicalMap');
+      if (!el || typeof L === 'undefined') return;
+      leafletMap = L.map('nyPhysicalMap', { preferCanvas: true }).setView([42.65, -75.4], 7);
+      // 100% Public Domain US Federal Government Basemap (USGS National Map — zero OpenStreetMap ODbL)
+      L.tileLayer(
+        'https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}',
+        {
+          maxZoom: 16,
+          attribution: 'Map: USGS National Map &amp; US Census TIGER/Line (Public Domain US Gov)'
+        }
+      ).addTo(leafletMap);
+      mapTractLayer = L.layerGroup().addTo(leafletMap);
+      mapGraphLayer = L.layerGroup().addTo(leafletMap);
+    }
+
+    async function loadStatePhysicalMap(st) {
+      initPhysicalMap();
+      if (!leafletMap) return;
+      try {
+        const res = await fetch(`/api/graph/map?state_code=${st}`);
+        mapStateData = await res.json();
+        renderPhysicalMapOverlay();
+        zoomMapRegion('state');
+      } catch (err) {
+        console.error('Failed to load physical map data', err);
+      }
+    }
+
+    function zoomMapRegion(region) {
+      if (!leafletMap) return;
+      if (activeState === 'MS') {
+        leafletMap.setView([33.35, -90.45], region === 'state' ? 8 : 10);
+        return;
+      }
+      if (region === 'bronx') {
+        leafletMap.setView([40.848, -73.895], 12);
+      } else if (region === 'catskills') {
+        leafletMap.setView([42.22, -74.88], 9);
+      } else {
+        leafletMap.setView([42.65, -75.5], 7);
+      }
+    }
+
+    function toggleTractLayer() {
+      showTractsOnMap = !showTractsOnMap;
+      renderPhysicalMapOverlay();
+    }
+
+    function renderPhysicalMapOverlay() {
+      if (!leafletMap || !mapStateData) return;
+      mapTractLayer.clearLayers();
+      mapGraphLayer.clearLayers();
+
+      if (showTractsOnMap && mapStateData.tracts) {
+        mapStateData.tracts.forEach(t => {
+          const isHighNoVeh = t.no_vehicle_pct >= 25.0;
+          const circle = L.circleMarker([t.lat, t.lon], {
+            radius: Math.max(4, Math.min(9, t.under5 / 80)),
+            fillColor: isHighNoVeh ? '#f43f5e' : '#64748b',
+            color: '#0f172a',
+            weight: 1,
+            opacity: 0.65,
+            fillOpacity: 0.38
+          });
+          circle.bindPopup(
+            `<strong>Census Tract ${t.geoid}</strong> (${t.county})<br>` +
+            `Children Under 5: <strong>${t.under5}</strong><br>` +
+            `Poverty Rate: <strong>${t.poverty_pct}%</strong><br>` +
+            `Zero-Vehicle Households: <strong>${t.no_vehicle_pct}%</strong>`
+          );
+          circle.addTo(mapTractLayer);
+        });
+      }
+
+      const cfg = STATE_DATA[activeState] || STATE_DATA.NY;
+      const activePaths = svgCurrentMode === 'both'
+        ? [cfg.paths.bounce, cfg.paths.eval]
+        : [cfg.paths[svgCurrentMode]];
+
+      const provById = {};
+      (mapStateData.providers || []).forEach(p => { provById[p.id] = p; });
+
+      const activeNodeIds = new Set();
+      activePaths.forEach(p => {
+        p.edges.forEach(e => {
+          activeNodeIds.add(e.from);
+          activeNodeIds.add(e.to);
+          const u = provById[e.from];
+          const v = provById[e.to];
+          if (u && v) {
+            const isFax = e.chan === 'paper_fax';
+            const line = L.polyline([[u.lat, u.lon], [v.lat, v.lon]], {
+              color: p.color,
+              weight: isFax ? 4.5 : 4,
+              opacity: 0.92,
+              dashArray: isFax ? '8, 6' : null
+            });
+            line.bindTooltip(
+              `<strong>${p.id} Hop ${e.hop}:</strong> ${u.id.split('-').pop()} → ${v.id.split('-').pop()} (+${e.days}d via ${e.chan})`,
+              { sticky: true }
+            );
+            line.addTo(mapGraphLayer);
+          }
+        });
+      });
+
+      const roleColors = {
+        'Screening_Pediatric_Clinic': '#38bdf8',
+        'Part_C_Intake_Coordinator': '#f59e0b',
+        'Multidisciplinary_Eval_Hub': '#a855f7',
+        'EI_Therapy_Vendor': '#10b981'
+      };
+
+      (mapStateData.providers || []).forEach(p => {
+        const isActive = activeNodeIds.has(p.id);
+        const isBounceHub = p.id.endsWith('-011') || p.id.endsWith('-012');
+        const marker = L.circleMarker([p.lat, p.lon], {
+          radius: isActive ? 10 : 6.5,
+          fillColor: roleColors[p.role] || '#38bdf8',
+          color: isBounceHub ? '#ef4444' : '#0f172a',
+          weight: isBounceHub ? 3 : (isActive ? 2.5 : 1.5),
+          opacity: isActive ? 1.0 : 0.72,
+          fillOpacity: isActive ? 0.95 : 0.65
+        });
+        marker.bindPopup(
+          `<strong>${p.id}</strong><br>${p.name}<br>` +
+          `Role: <code>${p.role}</code><br>` +
+          `Internal Wait: <strong>${p.wait_days} days</strong> | Waitlist: ${p.waitlist}<br>` +
+          `Medicaid: ${p.medicaid ? 'Yes' : 'No'} | Bilingual: ${p.bilingual ? 'Yes' : 'No'}`
+        );
+        if (isActive) {
+          marker.bindTooltip(`${p.id.split('-').slice(-2).join('-')} (${p.wait_days}d)`, {
+            permanent: true,
+            direction: 'top',
+            offset: [0, -8],
+            className: 'small fw-bold'
+          });
+        }
+        marker.addTo(mapGraphLayer);
+      });
     }
 
     function renderSvgComparisonGraph() {

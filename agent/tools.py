@@ -50,12 +50,6 @@ def get_bq_client() -> bigquery.Client:
     return bigquery.Client(project=PROJECT_ID, location=LOCATION)
 
 
-def _bq_to_records(client: bigquery.Client, query_str: str) -> List[Dict[str, Any]]:
-    """Execute BigQuery query and return row dicts without requiring db-dtypes/pyarrow."""
-    query_job = client.query(query_str)
-    return [dict(row) for row in query_job.result()]
-
-
 def _load_local_parquet(table_name: str, state_code: str = DEFAULT_STATE) -> pd.DataFrame:
     """Load starter GeoParquet table from repo data/ directory as a resilient fallback."""
     path = DATA_DIR / f"{table_name}.parquet"
@@ -152,20 +146,18 @@ def trace_45day_breaches_and_bounce_hubs(
     target_state = (state_code or DEFAULT_STATE).strip().upper()
     try:
         bq = get_bq_client()
-        prov_rows = _bq_to_records(
-            bq,
+        prov_df = bq.query(
             f"SELECT provider_id, state_code, synthetic_organization_name, node_role, median_internal_wait_days, "
             f"active_waitlist_count, accepts_medicaid, bilingual_services_listed "
             f"FROM `{DATASET_ID}.pediatric_and_ei_provider_directory`"
-        )
-        if prov_rows and "state_code" in prov_rows[0]:
-            bq_states = {str(r.get("state_code", "")).upper() for r in prov_rows}
+        ).to_dataframe()
+        if not prov_df.empty and "state_code" in prov_df.columns:
+            bq_states = set(prov_df["state_code"].astype(str).str.upper().unique())
             if target_state not in bq_states:
                 raise ValueError(f"BigQuery holds {bq_states}, switching to {target_state} parquet dataset")
-        prov_dict = {r["provider_id"]: r for r in prov_rows}
-        gql_records = _bq_to_records(bq, gql)
-        gql_df = pd.DataFrame(gql_records)
-        hub_results = _bq_to_records(bq, hub_sql)
+        prov_dict = prov_df.set_index("provider_id").to_dict("index")
+        gql_df = bq.query(gql).to_dataframe()
+        hub_results = bq.query(hub_sql).to_dataframe().to_dict(orient="records")
         execution_mode = "bigquery_iso_gql"
     except Exception:
         # Local GeoParquet graph traversal for target_state (e.g. NY or MS)
@@ -410,8 +402,8 @@ def find_compliant_toddler_pathway(
 
     try:
         bq = get_bq_client()
-        gql_verified_chains = _bq_to_records(bq, gql_pathway_query)
-        routes = _bq_to_records(bq, sql)
+        gql_verified_chains = bq.query(gql_pathway_query).to_dataframe().to_dict(orient="records")
+        routes = bq.query(sql).to_dataframe().to_dict(orient="records")
         if not routes:
             raise ValueError(f"Tract {clean_geoid} ({inferred_state}) not in current BQ state load")
     except Exception:
@@ -618,10 +610,9 @@ def run_equity_and_counterfactual_audit() -> Dict[str, Any]:
 
     try:
         bq = get_bq_client()
-        equity_rows = _bq_to_records(bq, equity_sql)
-        cf_rows = _bq_to_records(bq, counterfactual_sql)
-        cf_row = cf_rows[0] if cf_rows else {}
-        nsch_rows = _bq_to_records(bq, nsch_sql)
+        equity_rows = bq.query(equity_sql).to_dataframe().to_dict(orient="records")
+        cf_row = bq.query(counterfactual_sql).to_dataframe().to_dict(orient="records")[0]
+        nsch_rows = bq.query(nsch_sql).to_dataframe().to_dict(orient="records")
     except Exception:
         ref_df = _load_local_parquet("deidentified_part_c_referral_logs")
         acs_df = _load_local_parquet("acs_under5_tract_demographics")
@@ -760,3 +751,84 @@ Si tiene preguntas o necesita apoyo con el transporte, comuníquese con su coord
         "english_note": english_note.strip(),
         "spanish_note": spanish_note.strip(),
     }
+
+
+def get_state_geospatial_graph_data(state_code: str = "NY") -> Dict[str, Any]:
+    """Return full geospatial CareNode vertices, ReferralHandoff edges, and ACS tracts for map overlay."""
+    st = (state_code or "NY").strip().upper()
+    prov_df = _load_local_parquet("pediatric_and_ei_provider_directory", state_code=st)
+    ref_df = _load_local_parquet("deidentified_part_c_referral_logs", state_code=st)
+    acs_df = _load_local_parquet("acs_under5_tract_demographics", state_code=st)
+
+    providers = []
+    for _, r in prov_df.iterrows():
+        providers.append(
+            {
+                "id": str(r["provider_id"]),
+                "name": str(r["synthetic_organization_name"]),
+                "role": str(r["node_role"]),
+                "lat": float(r["latitude"]),
+                "lon": float(r["longitude"]),
+                "wait_days": int(r["median_internal_wait_days"]),
+                "waitlist": int(r["active_waitlist_count"]),
+                "medicaid": bool(r["accepts_medicaid"]),
+                "bilingual": bool(r["bilingual_services_listed"]),
+                "tract": str(r["census_tract_geoid"]),
+            }
+        )
+
+    tracts = []
+    for _, r in acs_df.iterrows():
+        tracts.append(
+            {
+                "geoid": str(r["census_tract_geoid"]),
+                "county": str(r["county_name"]),
+                "lat": float(r["latitude"]),
+                "lon": float(r["longitude"]),
+                "under5": int(r["children_under_5_count"]),
+                "poverty_pct": round(float(r["poverty_rate"]) * 100.0, 1),
+                "no_vehicle_pct": round(float(r["no_vehicle_rate"]) * 100.0, 1),
+            }
+        )
+
+    chains = {}
+    for cid, grp in ref_df.sort_values("hop_sequence").groupby("case_chain_id"):
+        edges = []
+        for _, e in grp.iterrows():
+            edges.append(
+                {
+                    "hop": int(e["hop_sequence"]),
+                    "from": str(e["source_provider_id"]),
+                    "to": str(e["target_provider_id"]),
+                    "channel": str(e["transmission_channel"]),
+                    "wait_days": int(e["handoff_wait_days"]),
+                    "reason": str(e["handoff_reason"]),
+                }
+            )
+        tot_w = int(grp["handoff_wait_days"].sum())
+        chains[str(cid)] = {
+            "chain_id": str(cid),
+            "hops": int(len(grp)),
+            "total_wait_days": tot_w,
+            "breached": tot_w > 45,
+            "fax_hops": int((grp["transmission_channel"] == "paper_fax").sum()),
+            "child_age_months": int(grp["child_age_months"].iloc[0]),
+            "concern": str(grp["concern_domain"].iloc[0]),
+            "home_tract": str(grp["child_home_tract_geoid"].iloc[0]),
+            "edges": edges,
+        }
+
+    return {
+        "status": "success",
+        "state_code": st,
+        "map_license_notice": "Basemap: USGS National Map & US Census TIGER/Line (100% Public Domain US Government Work — Zero OpenStreetMap ODbL).",
+        "providers": providers,
+        "tracts": tracts,
+        "featured_chains": {
+            "bounce_4hop": chains.get(f"CHAIN-{st}-023"),
+            "compliant_3hop": chains.get(f"CHAIN-{st}-007"),
+            "fasttrack_2hop": chains.get(f"CHAIN-{st}-031"),
+        },
+        "all_chains": chains,
+    }
+
