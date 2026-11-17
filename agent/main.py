@@ -177,10 +177,10 @@ def index():
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>First Milestones - Early Intervention Triage & Network Audit</title>
-  <!-- Google Fonts: Open Sans (NYSED Official Typography) & Merriweather (State Official Serif) -->
+  <!-- Google Fonts: Quicksand & Nunito (Warm Child-Saving Typography) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,400;0,700;1,300&family=Open+Sans:ital,wght@0,300;0,400;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -188,164 +188,129 @@ def index():
   <script type="text/javascript" src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     :root {
-      /* NYSED (New York State Education Department) Official Branding Palette */
-      --nysed-navy: #002D62;        /* Official NYSED Deep Navy Blue */
-      --nysed-navy-dark: #001A3A;   /* State Header Deep Navy */
-      --nysed-blue: #004B87;        /* Core Blue Accent */
-      --nysed-gold: #C29B38;        /* NY State Seal Gold */
-      --nysed-gold-light: #F4E8C1;  /* Gold accent tint */
-      --nysed-gold-hover: #A37F22;
-      --nysed-bg-gray: #F4F6F9;     /* Clean institutional backdrop */
-      --nysed-text: #212529;
-      --nysed-text-muted: #59616B;
-      --nysed-border: #DDE2E8;
-      --primary-color: #004B87;
-      --primary-dark: #002D62;
-      --card-radius: 0.5rem;
+      /* Warm, nurturing child-saving pastel palette */
+      --pastel-sky: #e0f2fe;        /* Soft gentle baby sky blue */
+      --pastel-sky-deep: #38bdf8;   /* Sky accent */
+      --pastel-mint: #dcfce7;       /* Gentle healing mint green */
+      --pastel-mint-deep: #22c55e;  /* Vitality green */
+      --pastel-peach: #ffedd5;      /* Warm nurturing soft peach */
+      --pastel-rose: #ffe4e6;       /* Gentle caring rose */
+      --pastel-rose-deep: #fb7185;  /* Rose alert */
+      --pastel-lavender: #f3e8ff;   /* Calming soft lavender */
+      --pastel-lavender-deep: #c084fc;
+      --pastel-butter: #fef9c3;     /* Warm sunshine buttercup */
+      --primary-color: #0284c7;     /* Ocean/Sky primary */
+      --card-radius: 1.15rem;
     }
     body {
-      background-color: var(--nysed-bg-gray);
-      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-      color: var(--nysed-text);
-      line-height: 1.55;
-      -webkit-font-smoothing: antialiased;
+      background: linear-gradient(180deg, #f0fdf4 0%, #f8fafc 40%, #fefce8 100%);
+      font-family: 'Nunito', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #1e293b;
+      min-height: 100vh;
     }
-    h1, h2, h3, .brand-title {
-      font-family: 'Merriweather', Georgia, serif;
-      letter-spacing: -0.2px;
-    }
-    h4, h5, h6, .fw-bold {
-      font-family: 'Open Sans', sans-serif;
-    }
-    /* Official NY State Top Banner */
-    .ny-gov-banner {
-      background-color: #111a24;
-      color: #ced4da;
-      font-size: 0.76rem;
-      padding: 0.35rem 1rem;
-      border-bottom: 2px solid var(--nysed-gold);
-    }
-    .ny-gov-banner a {
-      color: #e9ecef;
-      text-decoration: none;
-    }
-    .ny-gov-banner a:hover {
-      color: var(--nysed-gold-light);
-      text-decoration: underline;
+    h1, h2, h3, h4, h5, h6, .hero-title, .track-nav-btn {
+      font-family: 'Quicksand', 'Nunito', sans-serif;
     }
     .hero {
-      background: linear-gradient(135deg, rgba(0, 45, 98, 0.96) 0%, rgba(0, 75, 135, 0.92) 55%, rgba(10, 30, 60, 0.95) 100%),
-                  url("https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?auto=format&fit=crop&w=1920&q=80") center/cover no-repeat;
+      background: linear-gradient(135deg, #0284c7 0%, #0d9488 45%, #ec4899 100%);
       color: white;
-      padding: 2.2rem 1.5rem 1.8rem;
-      margin-bottom: 1.8rem;
-      box-shadow: 0 6px 20px rgba(0, 45, 98, 0.25);
-      border-bottom: 4px solid var(--nysed-gold);
+      padding: 2.2rem 1.5rem 1.9rem;
+      margin-bottom: 2rem;
+      border-bottom: 5px solid rgba(254, 240, 138, 0.4);
+      box-shadow: 0 8px 30px rgba(13, 148, 136, 0.2);
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      top: -50%;
+      right: -10%;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
     }
     .card {
       border-radius: var(--card-radius);
-      border: 1px solid var(--nysed-border);
-      box-shadow: 0 2px 10px rgba(0, 45, 98, 0.05);
+      border: 1px solid rgba(203, 213, 225, 0.5);
+      box-shadow: 0 4px 20px rgba(148, 163, 184, 0.12);
       margin-bottom: 1.5rem;
       background: #ffffff;
+      transition: all 0.2s ease-in-out;
     }
-    .card-header {
-      background-color: #f8fafc;
-      border-bottom: 1px solid var(--nysed-border);
-      font-weight: 700;
-      color: var(--nysed-navy);
-    }
-    .btn-primary {
-      background-color: var(--nysed-blue) !important;
-      border-color: var(--nysed-navy) !important;
-      font-weight: 600;
-    }
-    .btn-primary:hover, .btn-primary:focus {
-      background-color: var(--nysed-navy) !important;
-      border-color: var(--nysed-navy-dark) !important;
-    }
-    .btn-outline-primary {
-      color: var(--nysed-blue) !important;
-      border-color: var(--nysed-blue) !important;
-    }
-    .btn-outline-primary:hover {
-      background-color: var(--nysed-blue) !important;
-      color: #ffffff !important;
-    }
-    .badge-nysed-gold {
-      background-color: var(--nysed-gold) !important;
-      color: #ffffff !important;
-      font-weight: 700;
-      letter-spacing: 0.3px;
+    .card:hover {
+      box-shadow: 0 8px 25px rgba(148, 163, 184, 0.18);
     }
     .stat-badge {
-      font-size: 1.75rem;
+      font-size: 1.65rem;
       font-weight: 800;
       letter-spacing: -0.5px;
-      font-family: 'Open Sans', sans-serif;
     }
-    .badge-breach { background-color: #c92a2a; color: white; }
-    .badge-pass { background-color: #2b8a3e; color: white; }
+    .badge-breach { 
+      background-color: #f43f5e; 
+      color: white; 
+      box-shadow: 0 2px 6px rgba(244, 63, 94, 0.25);
+    }
+    .badge-pass { 
+      background-color: #10b981; 
+      color: white; 
+      box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+    }
     .chat-box {
       height: 420px;
       overflow-y: auto;
-      background: #fbfcfd;
-      border: 1px solid var(--nysed-border);
-      border-radius: 0.5rem;
+      background: #fdfbf7;
+      border: 1px solid #fed7aa;
+      border-radius: 1rem;
       padding: 1.2rem;
     }
     .msg-user {
-      background: linear-gradient(135deg, var(--nysed-blue), var(--nysed-navy));
+      background: linear-gradient(135deg, #0284c7, #0284c7);
       color: #ffffff;
-      border-radius: 0.75rem 0.75rem 0.15rem 0.75rem;
-      padding: 0.75rem 1.1rem;
-      margin-bottom: 0.75rem;
+      border-radius: 1.1rem 1.1rem 0.25rem 1.1rem;
+      padding: 0.8rem 1.15rem;
+      margin-bottom: 0.85rem;
       max-width: 82%;
       margin-left: auto;
-      box-shadow: 0 2px 6px rgba(0, 45, 98, 0.2);
+      box-shadow: 0 3px 10px rgba(2, 132, 199, 0.25);
     }
     .msg-agent {
       background-color: #ffffff;
-      color: #1a202c;
-      border: 1px solid #d0d7de;
-      border-left: 4px solid var(--nysed-gold);
-      border-radius: 0.2rem 0.75rem 0.75rem 0.75rem;
+      color: #0f172a;
+      border: 1px solid #e0e7ff;
+      border-left: 4px solid #38bdf8;
+      border-radius: 1.1rem 1.1rem 1.1rem 0.25rem;
       padding: 0.85rem 1.15rem;
-      margin-bottom: 0.75rem;
+      margin-bottom: 0.85rem;
       max-width: 88%;
       white-space: pre-wrap;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+      box-shadow: 0 3px 10px rgba(148, 163, 184, 0.1);
       line-height: 1.55;
     }
     .track-nav-btn {
-      border-radius: 0.35rem !important;
-      padding: 0.6rem 1.15rem;
-      font-weight: 600;
-      font-size: 0.90rem;
-      transition: all 0.2s ease-in-out;
-      border: 1px solid rgba(255, 255, 255, 0.35);
-      font-family: 'Open Sans', sans-serif;
+      border-radius: 2rem !important;
+      padding: 0.65rem 1.3rem;
+      font-weight: 700;
+      font-size: 0.92rem;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      background: rgba(255, 255, 255, 0.15);
+      color: #ffffff;
+      backdrop-filter: blur(4px);
+    }
+    .track-nav-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      color: #ffffff;
+      transform: translateY(-1px);
     }
     .track-nav-btn.active {
       background: #ffffff !important;
-      color: var(--nysed-navy) !important;
+      color: #0f766e !important;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+      transform: translateY(-2px);
       border-color: #ffffff !important;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
-      font-weight: 700;
-    }
-    .track-nav-btn-light {
-      opacity: 0.82;
-      font-size: 0.85rem !important;
-      padding: 0.5rem 0.95rem !important;
-      border: 1px solid rgba(255, 255, 255, 0.3) !important;
-      background: rgba(0, 26, 58, 0.45) !important;
-      color: #f1f5f9 !important;
-    }
-    .track-nav-btn-light:hover {
-      opacity: 1.0;
-      background: rgba(0, 26, 58, 0.75) !important;
-      color: #ffffff !important;
-      border-color: var(--nysed-gold) !important;
     }
     .track-pane {
       display: none;
@@ -359,73 +324,93 @@ def index():
       to { opacity: 1; transform: translateY(0); }
     }
     .kpi-card {
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-      border-top: 3px solid var(--nysed-blue);
+      transition: all 0.25s ease;
+      border-radius: 1.1rem;
     }
     .kpi-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 18px rgba(0, 45, 98, 0.1);
+      transform: translateY(-3px);
+    }
+    .kpi-card-breach {
+      background: linear-gradient(145deg, #fff1f2 0%, #ffffff 100%);
+      border: 1px solid #fecdd3;
+    }
+    .kpi-card-bounce {
+      background: linear-gradient(145deg, #fffbeb 0%, #ffffff 100%);
+      border: 1px solid #fef08a;
+    }
+    .kpi-card-saved {
+      background: linear-gradient(145deg, #f0fdf4 0%, #ffffff 100%);
+      border: 1px solid #bbf7d0;
+    }
+    .kpi-card-pathway {
+      background: linear-gradient(145deg, #f0f9ff 0%, #ffffff 100%);
+      border: 1px solid #bae6fd;
     }
     .table-custom th {
-      background: #002D62 !important;
-      color: #ffffff !important;
-      font-weight: 600;
-      font-size: 0.80rem;
+      background: #f8fafc;
+      color: #475569;
+      font-weight: 700;
+      font-size: 0.82rem;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       border: none;
     }
     .form-control, .form-select {
-      border-radius: 0.35rem;
+      border-radius: 0.75rem;
       border-color: #cbd5e1;
-      font-family: 'Open Sans', sans-serif;
+      padding: 0.55rem 0.85rem;
     }
     .form-control:focus, .form-select:focus {
-      border-color: var(--nysed-blue);
-      box-shadow: 0 0 0 3px rgba(0, 75, 135, 0.18);
+      border-color: #0284c7;
+      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.18);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      border-color: #0284c7;
+      border-radius: 0.75rem;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+      border-color: #0369a1;
+      transform: translateY(-1px);
+    }
+    .child-safety-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: rgba(254, 240, 138, 0.25);
+      color: #fef08a;
+      padding: 0.35rem 0.85rem;
+      border-radius: 2rem;
+      font-weight: 700;
+      font-size: 0.82rem;
+      border: 1px solid rgba(254, 240, 138, 0.45);
     }
   </style>
 </head>
 <body>
-  <!-- Official NY.GOV State Bar -->
-  <div class="ny-gov-banner">
-    <div class="container d-flex justify-content-between align-items-center">
-      <div class="d-flex align-items-center gap-2">
-        <span class="fw-bold text-white tracking-wider" style="letter-spacing: 0.8px;">NY.GOV</span>
-        <span class="text-white-50">|</span>
-        <span>An Official New York State Early Intervention Quality System</span>
-      </div>
-      <div class="d-none d-md-flex gap-3">
-        <a href="https://www.nysed.gov/" target="_blank"><i class="fa-solid fa-graduation-cap me-1"></i>NYSED.gov</a>
-        <a href="https://www.health.ny.gov/community/infants_children/early_intervention/" target="_blank"><i class="fa-solid fa-notes-medical me-1"></i>NY DOH Early Intervention (BEI)</a>
-      </div>
-    </div>
-  </div>
-
   <div class="hero">
     <div class="container">
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
         <div class="d-flex align-items-center gap-3">
-          <!-- NYSED Seal Style Avatar -->
-          <div class="p-1 rounded-circle" style="background: var(--nysed-gold); box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
-            <img
-              src="https://images.unsplash.com/photo-1596464716127-f2a82984de30?auto=format&fit=crop&w=240&q=80"
-              alt="Toddler stacking wooden milestone blocks (Illustrative Only — Zero Real Patient PII)"
-              style="width: 72px; height: 72px; object-fit: cover; border-radius: 50%; border: 2px solid #ffffff;"
-            />
-          </div>
+          <img
+            src="https://images.unsplash.com/photo-1596464716127-f2a82984de30?auto=format&fit=crop&w=240&q=80"
+            alt="Toddler stacking wooden milestone blocks (Illustrative Only — Zero Real Patient PII)"
+            style="width: 80px; height: 80px; object-fit: cover; border-radius: 50%; border: 3px solid #fef9c3; box-shadow: 0 4px 14px rgba(0,0,0,0.18);"
+          />
           <div>
-            <div class="d-flex align-items-center gap-2 mb-1">
-              <span class="badge badge-nysed-gold px-2 py-1"><i class="fa-solid fa-shield-halved me-1"></i>NYSED / IDEA Part C</span>
-              <span class="badge bg-white bg-opacity-20 text-white" style="border: 1px solid rgba(255,255,255,0.25);">Early Intervention &amp; Developmental Screening</span>
+            <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+              <span class="badge rounded-pill px-3 py-1 fw-bold" style="background:#fef9c3; color:#854d0e;"><i class="fa-solid fa-heart-pulse me-1 text-danger"></i>Saving Children's Milestones</span>
+              <span class="badge rounded-pill px-3 py-1 fw-semibold" style="background:rgba(255,255,255,0.22); color:#ffffff;"><i class="fa-solid fa-shield-halved me-1"></i>IDEA Part C 45-Day Statutory Protection</span>
             </div>
-            <h1 class="h2 mb-1 fw-bold text-white">First Milestones: Triage &amp; Network-Audit</h1>
-            <p class="mb-0 text-white-50 small" style="letter-spacing: 0.2px;">BigQuery Property Graph (ISO GQL) · Google ADK Agent · Vertex AI Gemini 2.5 Flash</p>
+            <h1 class="h2 mb-1 fw-bold" style="letter-spacing:-0.5px;">First Milestones: Triage &amp; Network-Audit</h1>
+            <p class="mb-0 text-white-50 small">Every child deserves evaluation within 45 days · BigQuery ISO GQL Graph · Vertex AI Gemini</p>
           </div>
         </div>
         <div class="text-end">
-          <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill fw-bold small shadow-sm" style="background: var(--nysed-gold); color: #001A3A;">
-            <i class="fa-solid fa-map-pin text-danger"></i> State: New York (NY · FIPS 36)
+          <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill fw-bold small shadow-sm" style="background:#fef08a; color:#713f12;">
+            <i class="fa-solid fa-location-dot text-danger"></i> Active State: New York (NY · FIPS 36)
           </div>
           <div class="small mt-1 text-white-50">89 Census Tracts · 30 CareNodes · 100% [Synthetic] Network</div>
         </div>
@@ -434,23 +419,23 @@ def index():
       <!-- Functional Track Navigation Switcher -->
       <div class="mt-4 pt-3 border-top border-white border-opacity-20 d-flex flex-wrap justify-content-between align-items-center gap-3">
         <div class="d-flex align-items-center gap-2">
-          <span class="small text-uppercase fw-bold text-white-50 me-2"><i class="fa-solid fa-layer-group me-1"></i> Active View:</span>
+          <span class="small text-uppercase fw-bold text-white-50 me-2"><i class="fa-solid fa-child me-1"></i> Care Navigator:</span>
           <div class="btn-group" role="group" aria-label="Track Navigation">
             <button id="btnTrack1" type="button" class="btn btn-sm btn-light track-nav-btn active" onclick="activateTrack(1)">
-              <i class="fa-solid fa-compass me-1 text-primary"></i> Track 1: Today's Referral
+              <i class="fa-solid fa-hands-holding-child me-1 text-primary"></i> Track 1: Today's Referral
             </button>
-            <button id="btnTrack2" type="button" class="btn btn-sm track-nav-btn track-nav-btn-light" onclick="activateTrack(2)">
-              <i class="fa-solid fa-network-wired me-1"></i> Track 2: Quarterly Audit
+            <button id="btnTrack2" type="button" class="btn btn-sm btn-outline-light track-nav-btn" onclick="activateTrack(2)">
+              <i class="fa-solid fa-network-wired me-1"></i> Track 2: This Quarter's Audit
             </button>
-            <button id="btnTrack3" type="button" class="btn btn-sm track-nav-btn track-nav-btn-light" onclick="activateTrack(3)">
+            <button id="btnTrack3" type="button" class="btn btn-sm btn-outline-light track-nav-btn" onclick="activateTrack(3)">
               <i class="fa-solid fa-van-shuttle me-1"></i> Track 3: Outreach Season
             </button>
-            <button id="btnTrack4" type="button" class="btn btn-sm track-nav-btn track-nav-btn-light" onclick="activateTrack(4)">
-              🛠️ Track 4: Simulator
+            <button id="btnTrack4" type="button" class="btn btn-sm btn-outline-light fw-semibold" onclick="activateTrack(4)">
+              🌱 Track 4: Single Network Fix Simulator
             </button>
           </div>
         </div>
-        <div id="trackBannerInfo" class="small text-white px-3 py-1 rounded-pill" style="background: rgba(0, 45, 98, 0.65); border: 1px solid var(--nysed-gold);">
+        <div id="trackBannerInfo" class="small text-white px-3 py-1 rounded-pill" style="background: rgba(255,255,255,0.18); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.3);">
           <strong>Track 1:</strong> Route today's toddler referral (&le;45d compliant path with 36m age cliff guard).
         </div>
       </div>
@@ -461,30 +446,30 @@ def index():
     <!-- Top Summary Metrics (Executive Visibility Across All Tracks) -->
     <div class="row g-3 mb-4">
       <div class="col-6 col-lg-3">
-        <div class="card p-3 text-center kpi-card h-100">
-          <div class="stat-badge text-danger">26 / 35</div>
-          <div class="text-muted small fw-semibold">Multi-Hop Chains Breaching 45d</div>
-          <div class="text-secondary small mt-1" style="font-size:0.75rem;">Exposed by BigQuery ISO GQL</div>
+        <div class="card p-3 text-center kpi-card kpi-card-breach h-100">
+          <div class="stat-badge text-danger" style="color:#e11d48 !important;"><i class="fa-solid fa-triangle-exclamation me-1" style="font-size:1.1rem;"></i>26 / 35</div>
+          <div class="small fw-bold text-dark mt-1">Chains Breaching 45d Clock</div>
+          <div class="text-muted small mt-1" style="font-size:0.75rem;">Exposed by BigQuery ISO GQL</div>
         </div>
       </div>
       <div class="col-6 col-lg-3">
-        <div class="card p-3 text-center kpi-card h-100">
-          <div class="stat-badge text-primary">5 - 6 Days</div>
-          <div class="text-muted small fw-semibold">Deceptive "Bounce Hub" Wait</div>
+        <div class="card p-3 text-center kpi-card kpi-card-bounce h-100">
+          <div class="stat-badge text-warning" style="color:#d97706 !important;"><i class="fa-solid fa-hourglass-half me-1" style="font-size:1.1rem;"></i>5 - 6 Days</div>
+          <div class="small fw-bold text-dark mt-1">Deceptive "Bounce Hub" Wait</div>
           <div class="text-secondary small mt-1" style="font-size:0.75rem;">Conceals downstream fax loops</div>
         </div>
       </div>
       <div class="col-6 col-lg-3">
-        <div class="card p-3 text-center kpi-card h-100">
-          <div class="stat-badge text-success">1,168 Days</div>
-          <div class="text-muted small fw-semibold">Saved by Upgrading to EHR</div>
+        <div class="card p-3 text-center kpi-card kpi-card-saved h-100">
+          <div class="stat-badge text-success" style="color:#059669 !important;"><i class="fa-solid fa-shield-heart me-1" style="font-size:1.1rem;"></i>1,168 Days</div>
+          <div class="small fw-bold text-dark mt-1">Child-Days Saved by EHR Upgrade</div>
           <div class="text-secondary small mt-1" style="font-size:0.75rem;">100% breaches eliminated</div>
         </div>
       </div>
       <div class="col-6 col-lg-3">
-        <div class="card p-3 text-center kpi-card h-100">
-          <div class="stat-badge text-info">17 - 22 Days</div>
-          <div class="text-muted small fw-semibold">Graph-Optimized Toddler Pathway</div>
+        <div class="card p-3 text-center kpi-card kpi-card-pathway h-100">
+          <div class="stat-badge text-info" style="color:#0284c7 !important;"><i class="fa-solid fa-baby me-1" style="font-size:1.1rem;"></i>17 - 22 Days</div>
+          <div class="small fw-bold text-dark mt-1">Graph-Optimized Child Pathway</div>
           <div class="text-secondary small mt-1" style="font-size:0.75rem;">Guaranteed &le;45d IDEA Part C</div>
         </div>
       </div>
@@ -709,36 +694,39 @@ I partner with you to ensure every infant and toddler reaches their developmenta
 
             <div class="row g-3 mb-4">
               <div class="col-md-4">
-                <div class="border rounded-3 p-3 bg-light h-100">
-                  <div class="d-flex align-items-center gap-2 mb-2">
-                    <span class="badge bg-danger">Priority 1</span>
-                    <strong class="small">St. Lawrence County (Tract 36089491500)</strong>
+                <div class="border rounded-4 p-3 bg-white h-100 shadow-sm" style="border-left: 4px solid #fb7185 !important; background: linear-gradient(145deg, #fff1f2 0%, #ffffff 100%);">
+                  <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="badge rounded-pill bg-danger px-2 py-1"><i class="fa-solid fa-triangle-exclamation me-1"></i>Priority 1</span>
+                    <span class="badge rounded-pill" style="background:#fee2e2; color:#991b1b;"><i class="fa-solid fa-baby me-1"></i>High Risk</span>
                   </div>
-                  <div class="text-muted small mb-1">Poverty Rate: <strong>25.4%</strong> • Zero-Vehicle: <strong>24.0%</strong></div>
+                  <strong class="d-block mb-1" style="font-size:0.95rem;">St. Lawrence County (Tract 36089491500)</strong>
+                  <div class="text-muted small mb-1">Under-5 Poverty: <strong>25.4%</strong> • Zero-Vehicle: <strong>24.0%</strong></div>
                   <div class="text-muted small mb-2">Avg Referral Wait: <strong class="text-danger">77.0 Days</strong> (Multi-Hop Fax)</div>
-                  <span class="badge bg-danger text-white">Deploy: Mobile Dev Van + NEMT</span>
+                  <span class="badge rounded-pill px-3 py-1 text-white shadow-sm" style="background:#e11d48;"><i class="fa-solid fa-van-shuttle me-1"></i>Deploy: Mobile Dev Van + NEMT</span>
                 </div>
               </div>
               <div class="col-md-4">
-                <div class="border rounded-3 p-3 bg-light h-100">
-                  <div class="d-flex align-items-center gap-2 mb-2">
-                    <span class="badge bg-warning text-dark">Priority 2</span>
-                    <strong class="small">St. Lawrence County (Tract 36089491000)</strong>
+                <div class="border rounded-4 p-3 bg-white h-100 shadow-sm" style="border-left: 4px solid #f59e0b !important; background: linear-gradient(145deg, #fefce8 0%, #ffffff 100%);">
+                  <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="badge rounded-pill bg-warning text-dark px-2 py-1"><i class="fa-solid fa-clock me-1"></i>Priority 2</span>
+                    <span class="badge rounded-pill" style="background:#fef9c3; color:#854d0e;"><i class="fa-solid fa-route me-1"></i>Bounce Loop</span>
                   </div>
-                  <div class="text-muted small mb-1">Poverty Rate: <strong>13.4%</strong> • Zero-Vehicle: <strong>4.1%</strong></div>
+                  <strong class="d-block mb-1" style="font-size:0.95rem;">St. Lawrence County (Tract 36089491000)</strong>
+                  <div class="text-muted small mb-1">Under-5 Poverty: <strong>13.4%</strong> • Zero-Vehicle: <strong>4.1%</strong></div>
                   <div class="text-muted small mb-2">Avg Referral Wait: <strong class="text-danger">77.0 Days</strong> (Bounce Loop)</div>
-                  <span class="badge bg-primary text-white">Deploy: Community Screening Day 1</span>
+                  <span class="badge rounded-pill px-3 py-1 text-white shadow-sm" style="background:#0284c7;"><i class="fa-solid fa-calendar-check me-1"></i>Deploy: Community Screening Day 1</span>
                 </div>
               </div>
               <div class="col-md-4">
-                <div class="border rounded-3 p-3 bg-light h-100">
-                  <div class="d-flex align-items-center gap-2 mb-2">
-                    <span class="badge bg-secondary">Priority 3</span>
-                    <strong class="small">Bronx County (Tract 36005019700)</strong>
+                <div class="border rounded-4 p-3 bg-white h-100 shadow-sm" style="border-left: 4px solid #10b981 !important; background: linear-gradient(145deg, #f0fdf4 0%, #ffffff 100%);">
+                  <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="badge rounded-pill bg-success px-2 py-1"><i class="fa-solid fa-shield-heart me-1"></i>Priority 3</span>
+                    <span class="badge rounded-pill" style="background:#dcfce7; color:#166534;"><i class="fa-solid fa-bus me-1"></i>Transit Deficit</span>
                   </div>
-                  <div class="text-muted small mb-1">Poverty Rate: <strong>21.2%</strong> • Zero-Vehicle: <strong class="text-danger">83.5% Deficit</strong></div>
+                  <strong class="d-block mb-1" style="font-size:0.95rem;">Bronx County (Tract 36005019700)</strong>
+                  <div class="text-muted small mb-1">Under-5 Poverty: <strong>21.2%</strong> • Zero-Vehicle: <strong class="text-danger">83.5% Deficit</strong></div>
                   <div class="text-muted small mb-2">Nearest Eval Hub: <strong class="text-danger">111.7 Miles</strong> (Cross-County Bounces)</div>
-                  <span class="badge bg-success text-white">Deploy: Bilingual Tele-Assessment</span>
+                  <span class="badge rounded-pill px-3 py-1 text-white shadow-sm" style="background:#059669;"><i class="fa-solid fa-laptop-medical me-1"></i>Deploy: Bilingual Tele-Assessment</span>
                 </div>
               </div>
             </div>
@@ -844,13 +832,13 @@ I partner with you to ensure every infant and toddler reaches their developmenta
     <!-- Interactive Single Network Fix Simulator (Challenge Requirement) -->
     <div id="trackPane4" class="track-pane row mt-2">
       <div class="col-12">
-        <div class="card p-4 border-primary">
+        <div class="card p-4" style="border: 2px solid #bae6fd; background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);">
           <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
             <div>
-              <span class="badge bg-primary text-white mb-1">Graph Counterfactual Intervention</span>
-              <h5 class="card-title mb-1">🛠️ Simulate Single Network Fix: Paper Fax &rarr; Electronic EHR Intake + Bilingual Pre-Check</h5>
+              <span class="badge rounded-pill mb-1 fw-bold" style="background:#dcfce7; color:#15803d;"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>Graph Counterfactual Intervention</span>
+              <h5 class="card-title mb-1 fw-bold text-dark"><i class="fa-solid fa-seedling text-success me-2"></i>Simulate Single Network Fix: Paper Fax &rarr; Electronic EHR Intake + Bilingual Pre-Check</h5>
               <p class="text-muted small mb-0">
-                Compute exactly how many breached referral cases drop under the 45-day statutory limit if a regional Part C coordinator switches to electronic intake with pre-checked bilingual evaluator slots.
+                Compute exactly how many breached toddler referral cases drop under the 45-day statutory limit when a regional Part C coordinator switches to electronic intake with pre-checked bilingual evaluator slots.
               </p>
             </div>
             <div class="d-flex align-items-center gap-2">
@@ -864,12 +852,12 @@ I partner with you to ensure every infant and toddler reaches their developmenta
             </div>
           </div>
 
-          <div id="simResultsArea" class="p-3 bg-light rounded border">
+          <div id="simResultsArea" class="p-3 rounded-4 border" style="background:#fefce8; border-color:#fef08a !important;">
             <!-- Executive Summary Alert Banner -->
-            <div class="alert alert-success d-flex align-items-center mb-3 p-3">
-              <div class="fs-3 me-3">🎯</div>
+            <div class="alert d-flex align-items-center mb-3 p-3 rounded-3" style="background:linear-gradient(135deg, #dcfce7 0%, #ecfdf5 100%); border:1px solid #86efac; color:#14532d;">
+              <div class="fs-2 me-3">🌱</div>
               <div>
-                <h6 class="alert-heading mb-1 fw-bold">Network Fix Simulation Summary: Indianola Regional Intake Desk (SYN-PROV-MS-011)</h6>
+                <h6 class="alert-heading mb-1 fw-bold"><i class="fa-solid fa-shield-heart me-1 text-success"></i>Network Fix Simulation Summary: Indianola Regional Intake Desk (SYN-PROV-MS-011)</h6>
                 <div id="simExecutiveSummary" class="small mb-0">
                   Switching <strong>Indianola Regional Part C Intake Desk</strong> from <code>paper_fax</code> to <strong>electronic EHR intake</strong> with <strong>pre-checked bilingual evaluator slots</strong> rescues <strong>6 of 7 breached referral chains (85.7%)</strong> directly under the 45-day federal IFSP statutory limit. Average referral latency drops from <strong>74.3 days down to 36.3 days</strong>, slashing <strong>246 delayed child-days</strong> and decreasing statewide breaches by <strong>23.1% (from 26 down to 20)</strong>.
                 </div>
@@ -878,28 +866,28 @@ I partner with you to ensure every infant and toddler reaches their developmenta
 
             <div class="row g-3 text-center mb-3">
               <div class="col-md-3">
-                <div class="p-3 bg-white rounded border shadow-sm">
+                <div class="p-3 bg-white rounded-3 border shadow-sm" style="border-top: 3px solid #fb7185 !important;">
                   <div class="text-muted small text-uppercase fw-semibold">Coordinator Breaches</div>
                   <div id="simStatOrig" class="fw-bold text-danger fs-4 mt-1">7 Cases (&gt;45d)</div>
                   <div class="small text-muted">Baseline Fax Latency ~74.3d</div>
                 </div>
               </div>
               <div class="col-md-3">
-                <div class="p-3 bg-white rounded border shadow-sm">
+                <div class="p-3 bg-white rounded-3 border shadow-sm" style="border-top: 3px solid #10b981 !important;">
                   <div class="text-muted small text-uppercase fw-semibold">Cases Dropped &le;45d</div>
                   <div id="simStatRescued" class="fw-bold text-success fs-4 mt-1">6 Rescued (&le;45d)</div>
                   <div class="small text-success fw-bold">85.7% Hub Recovery Rate</div>
                 </div>
               </div>
               <div class="col-md-3">
-                <div class="p-3 bg-white rounded border shadow-sm">
+                <div class="p-3 bg-white rounded-3 border shadow-sm" style="border-top: 3px solid #0284c7 !important;">
                   <div class="text-muted small text-uppercase fw-semibold">Statewide Impact</div>
                   <div id="simStatState" class="fw-bold text-primary fs-4 mt-1">26 &rarr; 20 (-23.1%)</div>
                   <div class="small text-muted">Across 44 Multi-Hop Chains</div>
                 </div>
               </div>
               <div class="col-md-3">
-                <div class="p-3 bg-white rounded border shadow-sm">
+                <div class="p-3 bg-white rounded-3 border shadow-sm" style="border-top: 3px solid #059669 !important;">
                   <div class="text-muted small text-uppercase fw-semibold">Delayed Child-Days Saved</div>
                   <div id="simStatDays" class="fw-bold text-success fs-4 mt-1">246 Child-Days</div>
                   <div class="small text-muted">Slashing Wait from 74.3d to 36.3d</div>
