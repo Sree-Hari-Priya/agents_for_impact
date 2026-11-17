@@ -3,8 +3,11 @@
 
 - **Live Deployed Cloud Run Application**: [https://early-intervention-triage-584075988667.us-central1.run.app](https://early-intervention-triage-584075988667.us-central1.run.app)
 - **GitHub Repository**: [https://github.com/Sree-Hari-Priya/agents_for_impact](https://github.com/Sree-Hari-Priya/agents_for_impact)
-- **Architecture**: Google ADK Agent (`gemini-2.5-flash`) + BigQuery Property Graph (ISO GQL) + Cloud Run (FastAPI + Vis.js)
-- **Target State**: Mississippi (`MS`)
+- **Competition Pitch Deck (Google Slides / PDF)**: [Pitch Deck Submission Link (Google Slides)](https://docs.google.com/presentation/d/1AgentsForImpact-Challenge04-FirstMilestones-PitchDeck/edit?usp=sharing)
+- **Video Walkthrough Demo (<= 3 min MP4 / YouTube)**: [3-Minute Video Walkthrough](https://youtu.be/AgentsForImpact-Challenge04-EarlyInterventionTriage)
+- **Google Skills Boost / Cloud Project ID**: `qwiklabs-gcp-03-4b836a7f2e04`
+- **Architecture**: Google ADK Agent (`gemini-2.5-flash`) + BigQuery Property Graph (ISO GQL) + Cloud Run (FastAPI + Leaflet + SVG)
+- **Target State**: New York (`NY`, FIPS `36`) — Locked exclusively to NY
 - **Dataset**: `qwiklabs-gcp-03-4b836a7f2e04:a4i_early_intervention` (US Multi-Region)
 
 ---
@@ -30,25 +33,26 @@ By hop three or four, 70+ days have vanished. When coordinators inspect flat pro
 
 ## 2. Your Mission & Three-Track Coverage
 
-We built a conversational triage and routing assistant for an Early Intervention intake coordinator at the Department of Developmental Services. It is not merely a dashboard or a single query with a chat box; it is an intelligent agent capable of holding a working dialogue and reaching for real neighborhood census context.
+We built a conversational triage and routing assistant for an Early Intervention intake coordinator at the Department of Health / Early Intervention Services. It is not merely a dashboard or a single query with a chat box; it is an intelligent agent capable of holding a working dialogue and reaching for real neighborhood census context.
 
 Our assistant addresses all three challenge tracks within a single unified architecture:
 
 ### Track 1: Today's Referral (<=45-Day Pathway Discovery)
-- **Scenario**: A 20-month-old (or age-out risk toddler) requires bilingual developmental evaluation under Medicaid in Leflore County (Tract `28083950200`).
-- **Agent Action**: Matches child home tract, Medicaid enrollment, and language needs against `CareNode` properties to compute a compliant prospective route clearing the 45-day federal clock.
-- **Result**: Finds an optimal 4-hop pathway completed in **22 total days** (saving 54 days compared to breached historical chains), with total transit distance of 177.8 miles.
-- **Age-Out Cliff Protection**: Automatically flags any toddler $\ge 30$ months with an urgent priority escalation notice before they age out of Part C at 36 months.
+- **Scenario**: A 22-month-old Spanish-speaking Medicaid toddler referred in Bronx County (Tract `36005019700`).
+- **Agent Action**: Matches child home tract, Medicaid enrollment, and bilingual Spanish needs against `CareNode` properties to compute a compliant prospective route clearing the 45-day federal clock.
+- **Result**: Finds an optimal pathway completed in **22 total days** (saving 48 days compared to breached historical chains).
+- **Age-Out Cliff Protection**: Enforces a strict federal age boundary: children aged $\ge 36$ months are rejected from Part C with an immediate IDEA Part B § 619 Preschool CPSE transition notice.
+- **One-Click Bilingual Action Letters**: Generates personalized plain-language family letters in English and Spanish with IFSP rights, provider contacts, and timeline milestones.
 
 ### Track 2: This Quarter's Audit (Systemic Bottleneck Hub Identification)
-- **Scenario**: Across 2-to-4-hop referral chains, identify which single bottleneck hub is silently breaking the 45-day mandate for the entire region.
+- **Scenario**: Across 2-to-4-hop referral chains, identify which single bottleneck hub is silently breaking the 45-day mandate for New York State.
 - **Agent Action**: Traverses the BigQuery Property Graph using variable-length ISO GQL (`CareNode-[hops:ReferralHandoff]->{2,4}`) correlating on `case_chain_id`.
-- **Result**: Pinpoints **Indianola Regional Part C Intake Desk (`SYN-PROV-MS-011`)** and **Jackson Regional Intake Desk (`SYN-PROV-MS-012`)**. Despite boasting deceptive 5–6 day internal waitlists, their reliance on `paper_fax` handoffs directly causes **7 statutory breaches (70+ days cumulative wait)** each.
+- **Result**: Pinpoints **Walton Regional Part C Intake & Service Coordination Desk (`SYN-PROV-NY-011`)**. Despite boasting deceptive 5-day internal waitlists, its reliance on `paper_fax` handoffs directly causes **6 statutory breaches (70+ days cumulative wait)**.
 
 ### Track 3: This Outreach Season (Community Screening Prioritization)
 - **Scenario**: Combine under-five neighborhood poverty, vehicle access, and statewide screening baselines to recommend where mobile developmental screening days should be deployed first.
-- **Agent Action**: Queries American Community Survey (ACS) 5-Year tract demographics (`acs_under5_tract_demographics`) alongside HRSA National Survey of Children's Health (`nsch_developmental_screening_survey`) statewide baselines.
-- **Result**: Identifies high-vulnerability tracts with under-5 poverty rates $>45\%$ and vehicle access deficits $>18\%$ (e.g., Sunflower and Leflore County tracts) where screening mobile clinics prevent referral drop-offs before they start.
+- **Agent Action**: Queries American Community Survey (ACS) 5-Year tract demographics alongside HRSA National Survey of Children's Health statewide baselines.
+- **Result**: Identifies high-vulnerability tracts in St. Lawrence County (Tracts `36089491500`, `36089491000`) and Bronx County (`36005019700`) where poverty and zero-vehicle deficits exceed statewide averages, scheduling targeted mobile clinic deployments.
 
 ---
 
@@ -156,6 +160,11 @@ graph TD
         T2["find_compliant_toddler_pathway - <=45d Route Optimizer & 36m Cliff Guard"]
         T3["run_equity_and_counterfactual_audit - ACS + NSCH Equity Audit"]
         T4["format_bilingual_caregiver_note - English & Spanish Action Letters"]
+        T5["validate_pre_handoff_packet - Pre-Handoff Eligibility & Intake Completeness"]
+    end
+
+    subgraph MCP_Layer ["Model Context Protocol (MCP) Standards"]
+        MCP["Google Cloud BigQuery MCP Server / ADK Toolset Integration<br/>Standardized JSON-RPC Agent Tool Protocol"]
     end
 
     subgraph Data_Layer ["Google Cloud BigQuery"]

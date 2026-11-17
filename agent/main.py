@@ -125,6 +125,27 @@ def validate_packet(req: PacketValidateRequest):
         state_code=req.state_code,
     )
 
+class CaregiverNoteRequest(BaseModel):
+    family_name: str = "Rivera"
+    child_name: str = "Mateo"
+    clinic_name: str = "Lockport Well-Child Pediatric Screening Group #01 [Synthetic]"
+    coordinator_name: str = "Walton Regional Part C Intake & Service Coordination Desk #11 [Synthetic]"
+    eval_hub_name: str = "Lockport Developmental-Behavioral & Speech Evaluation Center #19 [Synthetic]"
+    vendor_name: str = "Malone Early Childhood Speech, Occupational & Physical Therapy Organization #28 [Synthetic]"
+    estimated_total_days: int = 22
+
+@app.post("/api/caregiver/note")
+def generate_caregiver_note(req: CaregiverNoteRequest):
+    return format_bilingual_caregiver_note(
+        family_name=req.family_name,
+        child_name=req.child_name,
+        clinic_name=req.clinic_name,
+        coordinator_name=req.coordinator_name,
+        eval_hub_name=req.eval_hub_name,
+        vendor_name=req.vendor_name,
+        estimated_total_days=req.estimated_total_days,
+    )
+
 @app.get("/api/graph/map")
 def get_map_graph(state_code: str = "NY"):
     return get_state_geospatial_graph_data(state_code=state_code)
@@ -143,6 +164,7 @@ def index():
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>First Milestones - Early Intervention Triage & Network Audit</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script type="text/javascript" src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -510,33 +532,33 @@ I can help you resolve today's intake bottlenecks immediately:
                 <div class="border rounded-3 p-3 bg-light h-100">
                   <div class="d-flex align-items-center gap-2 mb-2">
                     <span class="badge bg-danger">Priority 1</span>
-                    <strong class="small">Leflore County (Tract 28083950700)</strong>
+                    <strong class="small">St. Lawrence County (Tract 36089491500)</strong>
                   </div>
-                  <div class="text-muted small mb-1">Poverty Rate: <strong>33.7%</strong> • Zero-Vehicle: <strong>13.0%</strong></div>
-                  <div class="text-muted small mb-2">Avg Referral Wait: <strong class="text-danger">76.0 Days</strong> (Multi-Hop Fax)</div>
-                  <span class="badge bg-primary text-white">Deploy: Mobile Dev Unit</span>
+                  <div class="text-muted small mb-1">Poverty Rate: <strong>25.4%</strong> • Zero-Vehicle: <strong>24.0%</strong></div>
+                  <div class="text-muted small mb-2">Avg Referral Wait: <strong class="text-danger">77.0 Days</strong> (Multi-Hop Fax)</div>
+                  <span class="badge bg-danger text-white">Deploy: Mobile Dev Van + NEMT</span>
                 </div>
               </div>
               <div class="col-md-4">
                 <div class="border rounded-3 p-3 bg-light h-100">
                   <div class="d-flex align-items-center gap-2 mb-2">
                     <span class="badge bg-warning text-dark">Priority 2</span>
-                    <strong class="small">Sunflower County (Tract 28133950401)</strong>
+                    <strong class="small">St. Lawrence County (Tract 36089491000)</strong>
                   </div>
-                  <div class="text-muted small mb-1">Poverty Rate: <strong>19.6%</strong> • Zero-Vehicle: <strong>9.2%</strong></div>
+                  <div class="text-muted small mb-1">Poverty Rate: <strong>13.4%</strong> • Zero-Vehicle: <strong>4.1%</strong></div>
                   <div class="text-muted small mb-2">Avg Referral Wait: <strong class="text-danger">77.0 Days</strong> (Bounce Loop)</div>
-                  <span class="badge bg-info text-dark">Deploy: Spanish ASQ-3 Pop-up</span>
+                  <span class="badge bg-primary text-white">Deploy: Community Screening Day 1</span>
                 </div>
               </div>
               <div class="col-md-4">
                 <div class="border rounded-3 p-3 bg-light h-100">
                   <div class="d-flex align-items-center gap-2 mb-2">
                     <span class="badge bg-secondary">Priority 3</span>
-                    <strong class="small">Hinds County (Tract 28049001600)</strong>
+                    <strong class="small">Bronx County (Tract 36005019700)</strong>
                   </div>
-                  <div class="text-muted small mb-1">Poverty Rate: <strong>23.8%</strong> • Zero-Vehicle: <strong class="text-danger">23.7% Deficit</strong></div>
-                  <div class="text-muted small mb-2">Avg Referral Wait: <strong class="text-danger">74.0 Days</strong> (Transit Barrier)</div>
-                  <span class="badge bg-success text-white">Deploy: Tele-Assessment + NEMT</span>
+                  <div class="text-muted small mb-1">Poverty Rate: <strong>21.2%</strong> • Zero-Vehicle: <strong class="text-danger">83.5% Deficit</strong></div>
+                  <div class="text-muted small mb-2">Nearest Eval Hub: <strong class="text-danger">111.7 Miles</strong> (Cross-County Bounces)</div>
+                  <span class="badge bg-success text-white">Deploy: Bilingual Tele-Assessment</span>
                 </div>
               </div>
             </div>
@@ -556,47 +578,38 @@ I can help you resolve today's intake bottlenecks immediately:
                 </thead>
                 <tbody id="equityTableBody">
                   <tr>
-                    <td><code>28133950401</code></td>
-                    <td>Sunflower County</td>
-                    <td><span class="badge bg-light text-dark border">19.6%</span></td>
-                    <td>9.2%</td>
+                    <td><code>36089491500</code></td>
+                    <td>St. Lawrence County</td>
+                    <td><span class="badge bg-light text-dark border">25.4%</span></td>
+                    <td><span class="badge bg-warning text-dark">24.0% High Deficit</span></td>
+                    <td><span class="badge bg-danger">77.0 days</span></td>
+                    <td>1 / 1</td>
+                    <td><span class="badge bg-danger">Mobile Evaluation Van</span></td>
+                  </tr>
+                  <tr>
+                    <td><code>36089491000</code></td>
+                    <td>St. Lawrence County</td>
+                    <td><span class="badge bg-light text-dark border">13.4%</span></td>
+                    <td>4.1%</td>
                     <td><span class="badge bg-danger">77.0 days</span></td>
                     <td>1 / 1</td>
                     <td><span class="badge bg-primary">Community Screening Day 1</span></td>
                   </tr>
                   <tr>
-                    <td><code>28049000301</code></td>
-                    <td>Hinds County</td>
-                    <td><span class="badge bg-light text-dark border">31.0%</span></td>
-                    <td>4.7%</td>
+                    <td><code>36089490300</code></td>
+                    <td>St. Lawrence County</td>
+                    <td><span class="badge bg-light text-dark border">17.5%</span></td>
+                    <td>9.5%</td>
                     <td><span class="badge bg-danger">76.0 days</span></td>
                     <td>1 / 1</td>
                     <td><span class="badge bg-primary">Community Screening Day 2</span></td>
                   </tr>
                   <tr>
-                    <td><code>28083950700</code></td>
-                    <td>Leflore County</td>
-                    <td><span class="badge bg-light text-dark border">33.7%</span></td>
-                    <td>13.0%</td>
-                    <td><span class="badge bg-danger">76.0 days</span></td>
-                    <td>1 / 1</td>
-                    <td><span class="badge bg-danger">Mobile Evaluation Van</span></td>
-                  </tr>
-                  <tr>
-                    <td><code>28011950701</code></td>
-                    <td>Bolivar County</td>
-                    <td><span class="badge bg-light text-dark border">36.8%</span></td>
-                    <td>11.8%</td>
-                    <td><span class="badge bg-danger">76.0 days</span></td>
-                    <td>1 / 1</td>
-                    <td><span class="badge bg-info text-dark">Bilingual Screening Pop-up</span></td>
-                  </tr>
-                  <tr>
-                    <td><code>28049001600</code></td>
-                    <td>Hinds County</td>
-                    <td><span class="badge bg-light text-dark border">23.8%</span></td>
-                    <td><span class="badge bg-warning text-dark">23.7% High Deficit</span></td>
-                    <td><span class="badge bg-danger">74.0 days</span></td>
+                    <td><code>36005019700</code></td>
+                    <td>Bronx County</td>
+                    <td><span class="badge bg-light text-dark border">21.2%</span></td>
+                    <td><span class="badge bg-warning text-dark">83.5% High Deficit</span></td>
+                    <td><span class="badge bg-danger">70.0 days</span></td>
                     <td>1 / 1</td>
                     <td><span class="badge bg-success">Tele-Assessment + NEMT</span></td>
                   </tr>
@@ -787,6 +800,40 @@ I can help you resolve today's intake bottlenecks immediately:
     </div>
   </div>
 
+  <!-- Modal: Bilingual Caregiver Action Note -->
+  <div class="modal fade" id="caregiverModal" tabindex="-1" aria-labelledby="caregiverModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="caregiverModalLabel"><i class="fa-solid fa-file-signature me-2"></i>Bilingual Caregiver Action Note (English &amp; Spanish)</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <ul class="nav nav-tabs mb-3" id="caregiverTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active fw-bold" id="en-tab" data-bs-toggle="tab" data-bs-target="#en-pane" type="button" role="tab">English Plain-Language Note</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link fw-bold" id="es-tab" data-bs-toggle="tab" data-bs-target="#es-pane" type="button" role="tab">Nota en Español para la Familia</button>
+            </li>
+          </ul>
+          <div class="tab-content" id="caregiverTabContent">
+            <div class="tab-pane fade show active" id="en-pane" role="tabpanel">
+              <div class="p-3 bg-light rounded border font-monospace small" id="caregiverNoteEn" style="white-space: pre-wrap;"></div>
+            </div>
+            <div class="tab-pane fade" id="es-pane" role="tabpanel">
+              <div class="p-3 bg-light rounded border font-monospace small" id="caregiverNoteEs" style="white-space: pre-wrap;"></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-outline-primary" onclick="window.print()"><i class="fa-solid fa-print me-1"></i> Print / Save PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     let sessionId = null;
     let activeState = "NY";
@@ -860,9 +907,12 @@ I can help you resolve today's intake bottlenecks immediately:
       const cfg = STATE_DATA[st];
       svgGraphNodes = cfg.nodes;
       svgGraphPaths = cfg.paths;
-      document.getElementById('btnStateNY').className = st === 'NY' ? 'btn btn-warning fw-bold text-dark' : 'btn btn-outline-light';
-      document.getElementById('btnStateMS').className = st === 'MS' ? 'btn btn-warning fw-bold text-dark' : 'btn btn-outline-light';
-      document.getElementById('tractGeoid').value = cfg.tract;
+      const btnNY = document.getElementById('btnStateNY');
+      if (btnNY) btnNY.className = st === 'NY' ? 'btn btn-warning fw-bold text-dark' : 'btn btn-outline-light';
+      const btnMS = document.getElementById('btnStateMS');
+      if (btnMS) btnMS.className = st === 'MS' ? 'btn btn-warning fw-bold text-dark' : 'btn btn-outline-light';
+      const tractInput = document.getElementById('tractGeoid');
+      if (tractInput) tractInput.value = cfg.tract;
       document.getElementById('graphCardTitle').innerHTML = `🕸️ ReferralGraph (${st}) Side-by-Side Pathway &amp; 45-Day Statutory Clock`;
       document.getElementById('graphCardSubtitle').innerHTML = `Comparing the <strong>${cfg.paths.bounce.total}-day 4-hop paper-fax bounce loop (${cfg.paths.bounce.id}, 32m toddler)</strong> vs. the <strong>${cfg.paths.eval.total}-day 3-hop e-referral route (${cfg.paths.eval.id})</strong> &amp; <strong>${cfg.paths.fast.total}-day 2-hop fast-track (${cfg.paths.fast.id})</strong> from the exact same ${st} clinic &amp; coordinator.`;
       document.getElementById('bounceTableTitle').innerText = `📊 ${cfg.name} Coordinator "Bounce Hub" Summary (Deceptive Waitlist vs Breaches)`;
@@ -1238,20 +1288,56 @@ I can help you resolve today's intake bottlenecks immediately:
         if (data.zero_vehicle_travel_guardrail && data.zero_vehicle_travel_guardrail.alert) {
           alertHtml += `<div class="alert alert-warning p-2 mb-2">🚐 <strong>${data.zero_vehicle_travel_guardrail.alert}</strong></div>`;
         }
+        window.currentTriagePathway = p;
         resultDiv.innerHTML = `
           ${alertHtml}
-          <div class="border rounded p-2 bg-light">
+          <div class="border rounded p-2 bg-light mb-2">
             <div class="fw-bold text-success">Compliant Pathway: ${p.total_estimated_wait_days} Total Days (<= 45d limit)</div>
-            <ol class="ps-3 mt-1 mb-0">
+            <ol class="ps-3 mt-1 mb-2">
               <li><strong>Clinic:</strong> ${p.screening_clinic} (${p.clinic_wait}d)</li>
               <li><strong>Coordinator:</strong> ${p.intake_coordinator} (${p.coord_wait}d)</li>
               <li><strong>Eval Hub:</strong> ${p.eval_hub} (${p.eval_wait}d, Bilingual: ${p.eval_bilingual})</li>
               <li><strong>Therapy Vendor:</strong> ${p.therapy_vendor} (${p.vendor_wait}d)</li>
             </ol>
+            <button type="button" class="btn btn-sm btn-outline-primary w-100 fw-bold" onclick="showCaregiverModal()">
+              <i class="fa-solid fa-file-signature me-1"></i> View / Print Bilingual Caregiver Action Note (EN/ES)
+            </button>
           </div>
         `;
       } else {
-        resultDiv.innerHTML = '<span class="text-danger">No local pathway cleared 45 days with specified constraints. Immediate escalation required.</span>';
+        resultDiv.innerHTML = `
+          ${data.age_warning ? `<div class="alert alert-danger p-2 mb-2">${data.age_warning}</div>` : ''}
+          <span class="text-danger fw-bold">No Part C pathway available.</span>
+          ${data.part_b_preschool_transition ? `<div class="alert alert-info p-2 mt-2"><strong>${data.part_b_preschool_transition.mandate}:</strong> ${data.part_b_preschool_transition.required_action}</div>` : ''}
+        `;
+      }
+    }
+
+    async function showCaregiverModal() {
+      const p = window.currentTriagePathway;
+      if (!p) return;
+      try {
+        const res = await fetch('/api/caregiver/note', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            family_name: "Rivera",
+            child_name: "Mateo",
+            clinic_name: p.screening_clinic,
+            coordinator_name: p.intake_coordinator,
+            eval_hub_name: p.eval_hub,
+            vendor_name: p.therapy_vendor,
+            estimated_total_days: p.total_estimated_wait_days
+          })
+        });
+        const noteData = await res.json();
+        document.getElementById('caregiverNoteEn').innerText = noteData.english_note || '';
+        document.getElementById('caregiverNoteEs').innerText = noteData.spanish_note || '';
+        const modalEl = document.getElementById('caregiverModal');
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+      } catch (err) {
+        console.error('Failed to load caregiver note:', err);
       }
     }
 

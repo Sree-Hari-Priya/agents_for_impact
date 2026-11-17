@@ -315,6 +315,35 @@ def find_compliant_toddler_pathway(
     clean_geoid = str(census_tract_geoid).strip().zfill(11) if census_tract_geoid else "36005019700"
     inferred_state = FIPS_TO_STATE.get(clean_geoid[:2], DEFAULT_STATE)
 
+    # Hard boundary: IDEA Part C strictly covers infants and toddlers aged 0-35 months.
+    if child_age_months >= 36:
+        return {
+            "status": "ineligible_aged_out_part_c",
+            "child_age_months": child_age_months,
+            "age_warning": (
+                f"STATUTORY AGING-OUT NOTICE: Child is {child_age_months} months old (3 years old). "
+                f"Under Federal Law (34 CFR § 303.211), children permanently age out of IDEA Part C early intervention "
+                f"at 36 months. Direct early intervention routing is closed. Immediate referral must be directed to "
+                f"the Local School District Committee on Preschool Special Education (CPSE) under IDEA Part B § 619."
+            ),
+            "part_b_preschool_transition": {
+                "mandate": "IDEA Part B Section 619 Preschool Special Education",
+                "intake_destination": "Local Education Agency (LEA) / School District CPSE",
+                "required_action": "Schedule CPSE transition conference and preschool IEP evaluation immediately.",
+            },
+            "zero_vehicle_travel_guardrail": None,
+            "census_tract_geoid": clean_geoid,
+            "criteria": {
+                "requires_medicaid": requires_medicaid,
+                "requires_bilingual": requires_bilingual,
+                "max_wait_days": max_wait_days,
+            },
+            "synthetic_disclosure": "NOTICE: All recommended providers are 100% [Synthetic] simulated records.",
+            "gql_verified_electronic_chains": [],
+            "compliant_pathways_count": 0,
+            "recommended_pathways": [],
+        }
+
     # Genuine variable-length ISO GQL pathway discovery query over ReferralGraph
     gql_pathway_query = f"""
     GRAPH {DATASET_ID}.ReferralGraph
@@ -770,15 +799,22 @@ Si tiene preguntas o necesita apoyo con el transporte, comuníquese con su coord
 
 def get_state_geospatial_graph_data(state_code: str = "NY") -> Dict[str, Any]:
     """Return full geospatial CareNode vertices, ReferralHandoff edges, and ACS tracts for map overlay."""
-    st = (state_code or "NY").strip().upper()
-    prov_df = _load_local_parquet("pediatric_and_ei_provider_directory", state_code=st)
-    ref_df = _load_local_parquet("deidentified_part_c_referral_logs", state_code=st)
-    acs_df = _load_local_parquet("acs_under5_tract_demographics", state_code=st)
-
+    st = (state_code or DEFAULT_STATE).strip().upper()
     providers = []
-    for _, r in prov_df.iterrows():
-        providers.append(
-            {
+    tracts = []
+    chains = {}
+
+    try:
+        bq = get_bq_client()
+        # 1. Providers
+        prov_rows = _bq_to_records(
+            bq,
+            f"SELECT provider_id, synthetic_organization_name, node_role, latitude, longitude, "
+            f"median_internal_wait_days, active_waitlist_count, accepts_medicaid, bilingual_services_listed, census_tract_geoid "
+            f"FROM `{DATASET_ID}.pediatric_and_ei_provider_directory` WHERE state_code = '{st}'"
+        )
+        for r in prov_rows:
+            providers.append({
                 "id": str(r["provider_id"]),
                 "name": str(r["synthetic_organization_name"]),
                 "role": str(r["node_role"]),
@@ -789,13 +825,17 @@ def get_state_geospatial_graph_data(state_code: str = "NY") -> Dict[str, Any]:
                 "medicaid": bool(r["accepts_medicaid"]),
                 "bilingual": bool(r["bilingual_services_listed"]),
                 "tract": str(r["census_tract_geoid"]),
-            }
-        )
+            })
 
-    tracts = []
-    for _, r in acs_df.iterrows():
-        tracts.append(
-            {
+        # 2. Tracts
+        tract_rows = _bq_to_records(
+            bq,
+            f"SELECT census_tract_geoid, county_name, latitude, longitude, children_under_5_count, "
+            f"poverty_rate, no_vehicle_rate "
+            f"FROM `{DATASET_ID}.acs_under5_tract_demographics` WHERE state_code = '{st}'"
+        )
+        for r in tract_rows:
+            tracts.append({
                 "geoid": str(r["census_tract_geoid"]),
                 "county": str(r["county_name"]),
                 "lat": float(r["latitude"]),
@@ -803,35 +843,108 @@ def get_state_geospatial_graph_data(state_code: str = "NY") -> Dict[str, Any]:
                 "under5": int(r["children_under_5_count"]),
                 "poverty_pct": round(float(r["poverty_rate"]) * 100.0, 1),
                 "no_vehicle_pct": round(float(r["no_vehicle_rate"]) * 100.0, 1),
-            }
-        )
+            })
 
-    chains = {}
-    for cid, grp in ref_df.sort_values("hop_sequence").groupby("case_chain_id"):
-        edges = []
-        for _, e in grp.iterrows():
-            edges.append(
-                {
+        # 3. Chains
+        ref_rows = _bq_to_records(
+            bq,
+            f"SELECT case_chain_id, hop_sequence, source_provider_id, target_provider_id, "
+            f"transmission_channel, handoff_wait_days, handoff_reason, child_age_months, "
+            f"concern_domain, child_home_tract_geoid "
+            f"FROM `{DATASET_ID}.deidentified_part_c_referral_logs` WHERE state_code = '{st}' "
+            f"ORDER BY case_chain_id, hop_sequence"
+        )
+        # Group by case_chain_id
+        grouped = {}
+        for row in ref_rows:
+            cid = str(row["case_chain_id"])
+            if cid not in grouped:
+                grouped[cid] = []
+            grouped[cid].append(row)
+
+        for cid, edge_list in grouped.items():
+            edges = []
+            tot_w = 0
+            fax_hops = 0
+            for e in edge_list:
+                w = int(e["handoff_wait_days"])
+                tot_w += w
+                if str(e["transmission_channel"]) == "paper_fax":
+                    fax_hops += 1
+                edges.append({
                     "hop": int(e["hop_sequence"]),
                     "from": str(e["source_provider_id"]),
                     "to": str(e["target_provider_id"]),
                     "channel": str(e["transmission_channel"]),
-                    "wait_days": int(e["handoff_wait_days"]),
+                    "wait_days": w,
                     "reason": str(e["handoff_reason"]),
+                })
+            first_e = edge_list[0]
+            chains[cid] = {
+                "chain_id": cid,
+                "hops": len(edge_list),
+                "total_wait_days": tot_w,
+                "breached": tot_w > 45,
+                "fax_hops": fax_hops,
+                "child_age_months": int(first_e["child_age_months"]),
+                "concern": str(first_e["concern_domain"]),
+                "home_tract": str(first_e["child_home_tract_geoid"]),
+                "edges": edges,
+            }
+    except Exception as e:
+        print(f"[WARN] Error fetching geospatial data from BigQuery: {e}")
+        try:
+            prov_df = _load_local_parquet("pediatric_and_ei_provider_directory", state_code=st)
+            ref_df = _load_local_parquet("deidentified_part_c_referral_logs", state_code=st)
+            acs_df = _load_local_parquet("acs_under5_tract_demographics", state_code=st)
+            for _, r in prov_df.iterrows():
+                providers.append({
+                    "id": str(r["provider_id"]),
+                    "name": str(r["synthetic_organization_name"]),
+                    "role": str(r["node_role"]),
+                    "lat": float(r["latitude"]),
+                    "lon": float(r["longitude"]),
+                    "wait_days": int(r["median_internal_wait_days"]),
+                    "waitlist": int(r["active_waitlist_count"]),
+                    "medicaid": bool(r["accepts_medicaid"]),
+                    "bilingual": bool(r["bilingual_services_listed"]),
+                    "tract": str(r["census_tract_geoid"]),
+                })
+            for _, r in acs_df.iterrows():
+                tracts.append({
+                    "geoid": str(r["census_tract_geoid"]),
+                    "county": str(r["county_name"]),
+                    "lat": float(r["latitude"]),
+                    "lon": float(r["longitude"]),
+                    "under5": int(r["children_under_5_count"]),
+                    "poverty_pct": round(float(r["poverty_rate"]) * 100.0, 1),
+                    "no_vehicle_pct": round(float(r["no_vehicle_rate"]) * 100.0, 1),
+                })
+            for cid, grp in ref_df.sort_values("hop_sequence").groupby("case_chain_id"):
+                edges = []
+                for _, e in grp.iterrows():
+                    edges.append({
+                        "hop": int(e["hop_sequence"]),
+                        "from": str(e["source_provider_id"]),
+                        "to": str(e["target_provider_id"]),
+                        "channel": str(e["transmission_channel"]),
+                        "wait_days": int(e["handoff_wait_days"]),
+                        "reason": str(e["handoff_reason"]),
+                    })
+                tot_w = int(grp["handoff_wait_days"].sum())
+                chains[str(cid)] = {
+                    "chain_id": str(cid),
+                    "hops": int(len(grp)),
+                    "total_wait_days": tot_w,
+                    "breached": tot_w > 45,
+                    "fax_hops": int((grp["transmission_channel"] == "paper_fax").sum()),
+                    "child_age_months": int(grp["child_age_months"].iloc[0]),
+                    "concern": str(grp["concern_domain"].iloc[0]),
+                    "home_tract": str(grp["child_home_tract_geoid"].iloc[0]),
+                    "edges": edges,
                 }
-            )
-        tot_w = int(grp["handoff_wait_days"].sum())
-        chains[str(cid)] = {
-            "chain_id": str(cid),
-            "hops": int(len(grp)),
-            "total_wait_days": tot_w,
-            "breached": tot_w > 45,
-            "fax_hops": int((grp["transmission_channel"] == "paper_fax").sum()),
-            "child_age_months": int(grp["child_age_months"].iloc[0]),
-            "concern": str(grp["concern_domain"].iloc[0]),
-            "home_tract": str(grp["child_home_tract_geoid"].iloc[0]),
-            "edges": edges,
-        }
+        except Exception:
+            pass
 
     return {
         "status": "success",
