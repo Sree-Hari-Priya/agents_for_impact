@@ -264,37 +264,7 @@ def index():
           <div class="p-2 rounded border mb-3" style="background-color: #0f172a; color: #f8fafc;">
             <svg id="svgReferralGraph" viewBox="0 0 760 235" style="width:100%; height:auto; display:block;"></svg>
           </div>
-          <div id="svgClockCards" class="row g-3 mb-4"></div>
-
-          <hr>
-          <div class="d-flex justify-content-between align-items-center mb-2 mt-3">
-            <div>
-              <h6 class="mb-1 fw-bold">🔍 Live BigQuery ISO GQL Case-Chain Inspector (All 26 Breached Chains)</h6>
-              <p class="text-muted small mb-0">
-                Select any individual breached chain returned by <code>GRAPH a4i_early_intervention.ReferralGraph MATCH (c:CareNode)-[hops:ReferralHandoff]-&gt;{2,4}(v:CareNode)</code>:
-              </p>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-              <label class="form-label small mb-0 fw-bold">Select Breached Case Chain:</label>
-              <select id="chainSelector" class="form-select form-select-sm w-auto" onchange="renderSelectedChain()">
-                <option value="">Loading graph chains...</option>
-              </select>
-            </div>
-          </div>
-          <div id="chainMetrics" class="mb-2 small"></div>
-          <div id="graphNetwork" style="height: 340px; border: 1px solid #dee2e6; border-radius: 0.5rem; background-color: #fafbfc;"></div>
-          <div class="d-flex justify-content-between align-items-center mt-2 small text-muted">
-            <div>
-              <span class="badge bg-primary me-1">&nbsp;</span> Screening Clinic
-              <span class="badge bg-warning text-dark mx-1">&nbsp;</span> Part C Intake Coordinator (Bounce Hub)
-              <span class="badge bg-info text-dark mx-1">&nbsp;</span> Multidisciplinary Eval Hub
-              <span class="badge bg-success ms-1">&nbsp;</span> EI Therapy Vendor
-            </div>
-            <div>
-              <span style="color:#e65100; font-weight:bold;">--- Paper Fax Handoff</span> |
-              <span style="color:#0288d1; font-weight:bold;">— EHR Portal / Phone</span>
-            </div>
-          </div>
+          <div id="svgClockCards" class="row g-3 mb-0"></div>
         </div>
       </div>
     </div>
@@ -351,31 +321,6 @@ def index():
 
   <script>
     let sessionId = null;
-    let graphChains = [];
-    let networkInstance = null;
-
-    async function loadGraphChains() {
-      try {
-        const res = await fetch('/api/graph/breaches');
-        const data = await res.json();
-        graphChains = data.breached_chains_sample || [];
-        
-        const selector = document.getElementById('chainSelector');
-        selector.innerHTML = '';
-        graphChains.forEach((c, idx) => {
-          const opt = document.createElement('option');
-          opt.value = idx;
-          opt.textContent = `${c.chain_id} - ${c.chain_wait_days}d (${c.total_hops} hops, ${c.fax_hops} fax hops)`;
-          selector.appendChild(opt);
-        });
-
-        if (graphChains.length > 0) {
-          renderSelectedChain();
-        }
-      } catch (err) {
-        console.error('Failed to load graph chains', err);
-      }
-    }
 
     function activateTrack(trackNum) {
       document.getElementById('btnTrack1').className = trackNum === 1 ? 'btn btn-sm btn-light fw-semibold text-primary active' : 'btn btn-sm btn-outline-light fw-semibold';
@@ -401,101 +346,9 @@ def index():
       }
     }
 
-    function renderSelectedChain() {
-      const selector = document.getElementById('chainSelector');
-      const idx = parseInt(selector.value);
-      if (isNaN(idx) || !graphChains[idx]) return;
-
-      const chain = graphChains[idx];
-      const metricsDiv = document.getElementById('chainMetrics');
-      const breachDays = chain.chain_wait_days - 45;
-
-      metricsDiv.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 w-100 p-2 bg-white rounded border">
-          <div>
-            <span class="badge bg-dark font-monospace me-2">${chain.chain_id}</span>
-            <span class="text-danger fw-bold"><i class="fa-solid fa-clock"></i> Total Wait: ${chain.chain_wait_days} Days</span>
-            <span class="badge bg-danger ms-2">+${breachDays}d Over Statutory Clock</span>
-          </div>
-          <div class="small text-muted">
-            <span class="me-3">Hops: <strong>${chain.total_hops}</strong></span>
-            <span class="text-danger fw-bold"><i class="fa-solid fa-fax"></i> Paper Fax Handoffs: ${chain.fax_hops}</span>
-          </div>
-        </div>
-      `;
-
-      // Enhanced Vis.js Nodes styling with icons and hierarchy
-      const roleThemes = {
-        'Screening_Pediatric_Clinic': { bg: '#1a73e8', icon: '🩺', border: '#1557b0' },
-        'Part_C_Intake_Coordinator': { bg: '#f29900', icon: '📋', border: '#b06000' },
-        'Multidisciplinary_Eval_Hub': { bg: '#00acc1', icon: '🧠', border: '#00838f' },
-        'EI_Therapy_Vendor': { bg: '#1e8e3e', icon: '🧸', border: '#137333' }
-      };
-
-      const nodes = chain.nodes.map((n, i) => {
-        const theme = roleThemes[n.role] || { bg: '#5f6368', icon: '🏢', border: '#3c4043' };
-        const cleanName = n.label.replace(' [Synthetic]', '');
-        return {
-          id: n.id,
-          label: `${theme.icon} Hop ${i+1}\n${cleanName}\n(${n.id})`,
-          shape: 'box',
-          margin: 12,
-          color: {
-            background: theme.bg,
-            border: theme.border,
-            highlight: { background: '#d93025', border: '#b31412' }
-          },
-          font: { color: '#ffffff', size: 12, bold: true, face: '-apple-system, BlinkMacSystemFont, Segoe UI' },
-          shadow: { enabled: true, color: 'rgba(0,0,0,0.18)', size: 5, x: 2, y: 3 },
-          title: `Provider: ${cleanName}\nRole: ${n.role}\nID: ${n.id}`
-        };
-      });
-
-      // Enhanced Vis.js Edges styling with high-visibility friction markers
-      const edges = chain.edges.map(e => {
-        const isFax = e.channel === 'paper_fax';
-        return {
-          from: e.from,
-          to: e.to,
-          label: `${isFax ? '📠 FAX' : '💻 EHR'}\n+${e.wait_days}d`,
-          arrows: { to: { enabled: true, scaleFactor: 1.1 } },
-          color: { color: isFax ? '#d93025' : '#1a73e8', highlight: '#b31412' },
-          dashes: isFax ? [8, 5] : false,
-          width: isFax ? 3.5 : 2.5,
-          font: { size: 11, face: 'monospace', align: 'top', background: '#ffffff', strokeWidth: 0, color: isFax ? '#c5221f' : '#174ea6' },
-          smooth: { type: 'cubicBezier', roundness: 0.2 }
-        };
-      });
-
-      const container = document.getElementById('graphNetwork');
-      const data = {
-        nodes: new vis.DataSet(nodes),
-        edges: new vis.DataSet(edges)
-      };
-
-      const options = {
-        layout: {
-          hierarchical: {
-            direction: 'LR',
-            sortMethod: 'directed',
-            levelSeparation: 250,
-            nodeSpacing: 110
-          }
-        },
-        physics: false,
-        interaction: { hover: true, zoomView: true, dragView: true }
-      };
-
-      if (networkInstance) {
-        networkInstance.destroy();
-      }
-      networkInstance = new vis.Network(container, data, options);
-    }
-
-    // Load graph chains on page ready
+    // Load SVG referral comparison graph on page ready
     window.addEventListener('DOMContentLoaded', () => {
       renderSvgComparisonGraph();
-      loadGraphChains();
     });
 
     const svgGraphNodes = [
