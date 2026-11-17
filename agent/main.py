@@ -143,25 +143,24 @@ def index():
           <div class="small mt-1 text-light">100% [Synthetic] Provider Topology · Illustrative Photo</div>
         </div>
       </div>
-      <!-- Track Badges -->
-      <div class="row g-2 mt-3 pt-2 border-top border-light border-opacity-25">
-        <div class="col-md-4">
-          <div class="small bg-white bg-opacity-10 p-2 rounded">
-            <strong>Track 1: Today's Referral</strong><br>
-            <span class="opacity-75">Route toddler to &le;45d compliant path with 36m age cliff guard.</span>
+      <!-- Interactive Track Mode Switcher -->
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-3 pt-3 border-top border-light border-opacity-25">
+        <div class="d-flex align-items-center gap-2">
+          <span class="small text-uppercase fw-bold opacity-75 me-1">Working Track Mode:</span>
+          <div class="btn-group" role="group">
+            <button id="btnTrack1" type="button" class="btn btn-sm btn-light fw-semibold text-primary active" onclick="activateTrack(1)">
+              Track 1: Today's Referral (<=45d Route)
+            </button>
+            <button id="btnTrack2" type="button" class="btn btn-sm btn-outline-light fw-semibold" onclick="activateTrack(2)">
+              Track 2: Quarterly Audit (Bounce Hubs)
+            </button>
+            <button id="btnTrack3" type="button" class="btn btn-sm btn-outline-light fw-semibold" onclick="activateTrack(3)">
+              Track 3: Outreach Season (Screening Days)
+            </button>
           </div>
         </div>
-        <div class="col-md-4">
-          <div class="small bg-white bg-opacity-10 p-2 rounded">
-            <strong>Track 2: This Quarter's Audit</strong><br>
-            <span class="opacity-75">Variable-length GQL reveals paper-fax bounce hubs breaking federal clock.</span>
-          </div>
-        </div>
-        <div class="col-md-4">
-          <div class="small bg-white bg-opacity-10 p-2 rounded">
-            <strong>Track 3: This Outreach Season</strong><br>
-            <span class="opacity-75">Combine under-5 poverty &amp; screening gaps for mobile clinic priority.</span>
-          </div>
+        <div id="trackBannerInfo" class="small text-white-50">
+          Ready to route a 20-month-old Spanish-speaking Medicaid referral in Leflore County.
         </div>
       </div>
     </div>
@@ -378,6 +377,30 @@ def index():
       }
     }
 
+    function activateTrack(trackNum) {
+      document.getElementById('btnTrack1').className = trackNum === 1 ? 'btn btn-sm btn-light fw-semibold text-primary active' : 'btn btn-sm btn-outline-light fw-semibold';
+      document.getElementById('btnTrack2').className = trackNum === 2 ? 'btn btn-sm btn-light fw-semibold text-primary active' : 'btn btn-sm btn-outline-light fw-semibold';
+      document.getElementById('btnTrack3').className = trackNum === 3 ? 'btn btn-sm btn-light fw-semibold text-primary active' : 'btn btn-sm btn-outline-light fw-semibold';
+
+      const info = document.getElementById('trackBannerInfo');
+      const input = document.getElementById('userInput');
+
+      if (trackNum === 1) {
+        info.innerHTML = "<strong>Track 1 Active:</strong> Route today's toddler referral (&le;45d compliant path with 36m age cliff guard).";
+        input.value = "Route a 20-month-old Spanish-speaking Medicaid toddler in Leflore County tract 28083950200.";
+        document.getElementById('childAge').scrollIntoView({ behavior: 'smooth' });
+      } else if (trackNum === 2) {
+        info.innerHTML = "<strong>Track 2 Active:</strong> Variable-length GQL exposes systemic paper-fax bounce hubs breaking federal clock.";
+        input.value = "Trace 3-to-4 hop referral chains breaching 45 days and identify the regional bounce hubs.";
+        setSvgGraphMode('both');
+        document.getElementById('svgReferralGraph').scrollIntoView({ behavior: 'smooth' });
+      } else if (trackNum === 3) {
+        info.innerHTML = "<strong>Track 3 Active:</strong> Combine ACS under-5 poverty & NSCH screening baselines to deploy mobile screening days.";
+        input.value = "Where should community developmental screening outreach days go first in Mississippi?";
+        document.getElementById('chatBox').scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
     function renderSelectedChain() {
       const selector = document.getElementById('chainSelector');
       const idx = parseInt(selector.value);
@@ -385,46 +408,62 @@ def index():
 
       const chain = graphChains[idx];
       const metricsDiv = document.getElementById('chainMetrics');
+      const breachDays = chain.chain_wait_days - 45;
+
       metricsDiv.innerHTML = `
-        <span class="badge badge-breach me-2">Chain: ${chain.chain_id}</span>
-        <span class="text-danger fw-bold me-2">Cumulative Wait: ${chain.chain_wait_days} Days (Statutory Breach: +${chain.chain_wait_days - 45}d)</span> |
-        <span class="text-muted ms-2">Hops: ${chain.total_hops} | Paper Fax Handoffs: ${chain.fax_hops}</span>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 w-100 p-2 bg-white rounded border">
+          <div>
+            <span class="badge bg-dark font-monospace me-2">${chain.chain_id}</span>
+            <span class="text-danger fw-bold"><i class="fa-solid fa-clock"></i> Total Wait: ${chain.chain_wait_days} Days</span>
+            <span class="badge bg-danger ms-2">+${breachDays}d Over Statutory Clock</span>
+          </div>
+          <div class="small text-muted">
+            <span class="me-3">Hops: <strong>${chain.total_hops}</strong></span>
+            <span class="text-danger fw-bold"><i class="fa-solid fa-fax"></i> Paper Fax Handoffs: ${chain.fax_hops}</span>
+          </div>
+        </div>
       `;
 
-      // Build Vis.js Nodes
-      const roleColors = {
-        'Screening_Pediatric_Clinic': '#1a73e8',
-        'Part_C_Intake_Coordinator': '#f29900',
-        'Multidisciplinary_Eval_Hub': '#00acc1',
-        'EI_Therapy_Vendor': '#2e7d32'
+      // Enhanced Vis.js Nodes styling with icons and hierarchy
+      const roleThemes = {
+        'Screening_Pediatric_Clinic': { bg: '#1a73e8', icon: '🩺', border: '#1557b0' },
+        'Part_C_Intake_Coordinator': { bg: '#f29900', icon: '📋', border: '#b06000' },
+        'Multidisciplinary_Eval_Hub': { bg: '#00acc1', icon: '🧠', border: '#00838f' },
+        'EI_Therapy_Vendor': { bg: '#1e8e3e', icon: '🧸', border: '#137333' }
       };
 
-      const nodes = chain.nodes.map(n => ({
-        id: n.id,
-        label: n.label.replace(' [Synthetic]', ''),
-        shape: 'box',
-        margin: 10,
-        color: {
-          background: roleColors[n.role] || '#5f6368',
-          border: '#3c4043',
-          highlight: { background: '#d93025', border: '#b31412' }
-        },
-        font: { color: '#ffffff', size: 12, bold: true },
-        shadow: true
-      }));
+      const nodes = chain.nodes.map((n, i) => {
+        const theme = roleThemes[n.role] || { bg: '#5f6368', icon: '🏢', border: '#3c4043' };
+        const cleanName = n.label.replace(' [Synthetic]', '');
+        return {
+          id: n.id,
+          label: `${theme.icon} Hop ${i+1}\n${cleanName}\n(${n.id})`,
+          shape: 'box',
+          margin: 12,
+          color: {
+            background: theme.bg,
+            border: theme.border,
+            highlight: { background: '#d93025', border: '#b31412' }
+          },
+          font: { color: '#ffffff', size: 12, bold: true, face: '-apple-system, BlinkMacSystemFont, Segoe UI' },
+          shadow: { enabled: true, color: 'rgba(0,0,0,0.18)', size: 5, x: 2, y: 3 },
+          title: `Provider: ${cleanName}\nRole: ${n.role}\nID: ${n.id}`
+        };
+      });
 
-      // Build Vis.js Edges
+      // Enhanced Vis.js Edges styling with high-visibility friction markers
       const edges = chain.edges.map(e => {
         const isFax = e.channel === 'paper_fax';
         return {
           from: e.from,
           to: e.to,
-          label: `${e.channel}\n(+${e.wait_days}d)`,
-          arrows: 'to',
-          color: { color: isFax ? '#e65100' : '#1976d2' },
-          dashes: isFax,
-          width: isFax ? 3 : 2,
-          font: { size: 11, align: 'top', background: '#ffffff', strokeWidth: 0 }
+          label: `${isFax ? '📠 FAX' : '💻 EHR'}\n+${e.wait_days}d`,
+          arrows: { to: { enabled: true, scaleFactor: 1.1 } },
+          color: { color: isFax ? '#d93025' : '#1a73e8', highlight: '#b31412' },
+          dashes: isFax ? [8, 5] : false,
+          width: isFax ? 3.5 : 2.5,
+          font: { size: 11, face: 'monospace', align: 'top', background: '#ffffff', strokeWidth: 0, color: isFax ? '#c5221f' : '#174ea6' },
+          smooth: { type: 'cubicBezier', roundness: 0.2 }
         };
       });
 
@@ -439,8 +478,8 @@ def index():
           hierarchical: {
             direction: 'LR',
             sortMethod: 'directed',
-            levelSeparation: 220,
-            nodeSpacing: 100
+            levelSeparation: 250,
+            nodeSpacing: 110
           }
         },
         physics: false,
