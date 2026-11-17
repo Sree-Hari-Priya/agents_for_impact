@@ -901,6 +901,8 @@ def simulate_single_network_fix(
             f"FROM `{DATASET_ID}.deidentified_part_c_referral_logs` "
             f"WHERE state_code = '{target_state}'"
         ).to_dataframe()
+        if prov_df.empty or ref_df.empty:
+            raise ValueError("Target state not found in BigQuery, falling back to local parquets")
         execution_mode = "bigquery_iso_gql"
     except Exception:
         prov_df = _load_local_parquet("pediatric_and_ei_provider_directory", state_code=target_state)
@@ -1003,7 +1005,19 @@ def simulate_single_network_fix(
     simulations_by_coordinator.sort(key=lambda s: (s["breached_cases_dropped_under_45d"], s["total_child_days_saved"]), reverse=True)
 
     # Focus on selected target coordinator
-    target_sim = next((s for s in simulations_by_coordinator if s["coordinator_id"] == coordinator_id), simulations_by_coordinator[0])
+    if simulations_by_coordinator:
+        target_sim = next((s for s in simulations_by_coordinator if s["coordinator_id"] == coordinator_id), simulations_by_coordinator[0])
+    else:
+        target_sim = {
+            "coordinator_id": coordinator_id or "NONE",
+            "coordinator_name": target_coordinator_name,
+            "total_chains_handled": 0,
+            "originally_breached_chains": 0,
+            "breached_cases_dropped_under_45d": 0,
+            "remediated_cases": [],
+            "total_child_days_saved": 0,
+            "state_breach_reduction_pct": 0.0,
+        }
 
     return {
         "status": "success",
