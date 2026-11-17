@@ -1,11 +1,42 @@
 import os
-from google.adk.agents.llm_agent import Agent
+from google.adk.agents import Agent, SequentialAgent
 from agent.tools import (
     trace_45day_breaches_and_bounce_hubs,
     find_compliant_toddler_pathway,
     run_equity_and_counterfactual_audit,
     format_bilingual_caregiver_note,
 )
+def _build_optional_bq_toolset(default_dataset_id: str) -> list:
+    """Attach ADK BigQueryToolset when Google Cloud ADC credentials are active."""
+    try:
+        import google.auth
+        from google.adk.tools.bigquery import BigQueryCredentialsConfig, BigQueryToolset
+        from google.adk.tools.bigquery.config import BigQueryToolConfig, WriteMode
+
+        creds, project_id = google.auth.default(
+            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+        )
+        effective_project = os.getenv("GOOGLE_CLOUD_PROJECT") or project_id
+        if not creds or not effective_project:
+            return []
+        cfg = BigQueryToolConfig(
+            location=os.getenv("A4I_LOCATION", "US"),
+            write_mode=WriteMode.BLOCKED,
+            compute_project_id=effective_project,
+            default_project_id=effective_project,
+            default_dataset_id=default_dataset_id,
+        )
+        return [
+            BigQueryToolset(
+                credentials_config=BigQueryCredentialsConfig(credentials=creds),
+                bigquery_tool_config=cfg,
+            )
+        ]
+    except Exception:
+        return []
+
+MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+DATASET_ID = os.getenv("A4I_DATASET", "a4i_early_intervention")
 
 SYSTEM_INSTRUCTION = """
 You are the Early Intervention Triage & Network-Audit Assistant ("First Milestones").
@@ -36,15 +67,58 @@ AVAILABLE TOOLS:
 Always provide clear, actionable summaries with exact data points, days elapsed, and specific provider names.
 """
 
+pathway_router_agent = Agent(
+    model=MODEL_NAME,
+    name="pathway_router_agent",
+    description="Selects optimal <=45-day bilingual/Medicaid route and flags 36-month aging-out urgency.",
+    instruction=(
+        "Use `find_compliant_toddler_pathway` and `trace_45day_breaches_and_bounce_hubs` "
+        "to select a compliant <=45-day pathway and contrast it against regional paper-fax bounce hubs."
+    ),
+    tools=[find_compliant_toddler_pathway, trace_45day_breaches_and_bounce_hubs],
+)
+
+equity_audit_agent = Agent(
+    model=MODEL_NAME,
+    name="equity_audit_agent",
+    description="Runs post-output demographic impact audit and counterfactual e-referral savings.",
+    instruction=(
+        "Use `run_equity_and_counterfactual_audit` strictly post-routing to report neighborhood "
+        "poverty, zero-vehicle travel barriers, audit_* shares, and counterfactual child-days saved."
+    ),
+    tools=[run_equity_and_counterfactual_audit],
+)
+
+caregiver_note_agent = Agent(
+    model=MODEL_NAME,
+    name="caregiver_note_agent",
+    description="Drafts plain-language English and Spanish family action notes.",
+    instruction=(
+        "Use `format_bilingual_caregiver_note` to produce a warm, jargon-free English and Spanish "
+        "action note confirming the <=45-day provider sequence."
+    ),
+    tools=[format_bilingual_caregiver_note],
+)
+
+brief_generator_pipeline = SequentialAgent(
+    name="brief_generator_pipeline",
+    description="End-to-end SequentialAgent generating the 45-Day Pathway & Bottleneck Brief.",
+    sub_agents=[pathway_router_agent, equity_audit_agent, caregiver_note_agent],
+)
+
 root_agent = Agent(
-    model="gemini-2.5-flash",
+    model=MODEL_NAME,
     name="early_intervention_triage_agent",
     description="Early Intervention Triage & Network-Audit Assistant for IDEA Part C coordinators.",
     instruction=SYSTEM_INSTRUCTION,
-    tools=[
-        trace_45day_breaches_and_bounce_hubs,
-        find_compliant_toddler_pathway,
-        run_equity_and_counterfactual_audit,
-        format_bilingual_caregiver_note,
-    ],
+    tools=(
+        _build_optional_bq_toolset(default_dataset_id=DATASET_ID)
+        + [
+            trace_45day_breaches_and_bounce_hubs,
+            find_compliant_toddler_pathway,
+            run_equity_and_counterfactual_audit,
+            format_bilingual_caregiver_note,
+        ]
+    ),
+    sub_agents=[brief_generator_pipeline],
 )

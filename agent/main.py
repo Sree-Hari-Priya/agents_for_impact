@@ -126,14 +126,21 @@ def index():
   <div class="hero">
     <div class="container">
       <div class="d-flex align-items-center justify-content-between">
-        <div>
-          <span class="badge bg-light text-dark mb-2">Challenge 04 · Early Intervention & Developmental Screening Triage</span>
-          <h1 class="h2 mb-1 font-weight-bold">First Milestones: IDEA Part C Triage & Network-Audit</h1>
-          <p class="mb-0 opacity-75">BigQuery Property Graph (ISO GQL) · Google ADK Agent · Vertex AI Gemini 2.5 Flash</p>
+        <div class="d-flex align-items-center gap-3">
+          <img
+            src="https://images.unsplash.com/photo-1596464716127-f2a82984de30?auto=format&fit=crop&w=240&q=80"
+            alt="Toddler stacking wooden milestone blocks (Illustrative Only — Zero Real Patient PII)"
+            style="width: 76px; height: 76px; object-fit: cover; border-radius: 50%; border: 3px solid rgba(255,255,255,0.85); box-shadow: 0 4px 10px rgba(0,0,0,0.2);"
+          />
+          <div>
+            <span class="badge bg-light text-dark mb-2">Challenge 04 · Early Intervention &amp; Developmental Screening Triage</span>
+            <h1 class="h2 mb-1 font-weight-bold">First Milestones: IDEA Part C Triage &amp; Network-Audit</h1>
+            <p class="mb-0 opacity-75">BigQuery Property Graph (ISO GQL) · Google ADK Agent · Vertex AI Gemini 2.5 Flash</p>
+          </div>
         </div>
         <div class="text-end">
           <span class="badge bg-warning text-dark px-3 py-2">State: Mississippi (MS)</span>
-          <div class="small mt-1 text-light">100% [Synthetic] Provider Topology</div>
+          <div class="small mt-1 text-light">100% [Synthetic] Provider Topology · Illustrative Photo</div>
         </div>
       </div>
       <!-- Track Badges -->
@@ -141,7 +148,7 @@ def index():
         <div class="col-md-4">
           <div class="small bg-white bg-opacity-10 p-2 rounded">
             <strong>Track 1: Today's Referral</strong><br>
-            <span class="opacity-75">Route toddler to <=45d compliant path with 36m age cliff guard.</span>
+            <span class="opacity-75">Route toddler to &le;45d compliant path with 36m age cliff guard.</span>
           </div>
         </div>
         <div class="col-md-4">
@@ -153,7 +160,7 @@ def index():
         <div class="col-md-4">
           <div class="small bg-white bg-opacity-10 p-2 rounded">
             <strong>Track 3: This Outreach Season</strong><br>
-            <span class="opacity-75">Combine under-5 poverty & screening gaps for mobile clinic priority.</span>
+            <span class="opacity-75">Combine under-5 poverty &amp; screening gaps for mobile clinic priority.</span>
           </div>
         </div>
       </div>
@@ -240,12 +247,32 @@ def index():
     <div class="row mt-4">
       <div class="col-12">
         <div class="card p-4">
-          <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
             <div>
-              <h5 class="card-title mb-1">🕸️ Interactive ISO GQL Multi-Hop Referral Path Graph</h5>
+              <h5 class="card-title mb-1">🕸️ ReferralGraph Side-by-Side Pathway &amp; 45-Day Statutory Clock</h5>
               <p class="text-muted small mb-0">
-                Visualizing multi-hop referral handoffs traversed via BigQuery ISO GQL (<code>CareNode-[ReferralHandoff]->{2,4}</code>).
-                Yellow dashed edges indicate <strong>paper fax handoffs</strong> causing downstream bounce backlogs.
+                Comparing the <strong>75-day 4-hop paper-fax bounce loop (CHAIN-MS-023, 32m toddler)</strong> vs. the <strong>37-day 3-hop e-referral route (CHAIN-MS-007)</strong> &amp; <strong>17-day 2-hop fast-track (CHAIN-MS-031)</strong> from the exact same clinic &amp; coordinator.
+              </p>
+            </div>
+            <div class="btn-group btn-group-sm" role="group">
+              <button id="btn-mode-both" type="button" class="btn btn-primary" onclick="setSvgGraphMode('both')">Compare Bounce vs. &le;45d Route</button>
+              <button id="btn-mode-bounce" type="button" class="btn btn-outline-danger" onclick="setSvgGraphMode('bounce')">🚨 4-Hop Fax Bounce (75d)</button>
+              <button id="btn-mode-eval" type="button" class="btn btn-outline-success" onclick="setSvgGraphMode('eval')">✅ 3-Hop E-Referral (37d)</button>
+              <button id="btn-mode-fast" type="button" class="btn btn-outline-info" onclick="setSvgGraphMode('fast')">⚡ 2-Hop Fast-Track (17d)</button>
+            </div>
+          </div>
+
+          <div class="p-2 rounded border mb-3" style="background-color: #0f172a; color: #f8fafc;">
+            <svg id="svgReferralGraph" viewBox="0 0 760 235" style="width:100%; height:auto; display:block;"></svg>
+          </div>
+          <div id="svgClockCards" class="row g-3 mb-4"></div>
+
+          <hr>
+          <div class="d-flex justify-content-between align-items-center mb-2 mt-3">
+            <div>
+              <h6 class="mb-1 fw-bold">🔍 Live BigQuery ISO GQL Case-Chain Inspector (All 26 Breached Chains)</h6>
+              <p class="text-muted small mb-0">
+                Select any individual breached chain returned by <code>GRAPH a4i_early_intervention.ReferralGraph MATCH (c:CareNode)-[hops:ReferralHandoff]-&gt;{2,4}(v:CareNode)</code>:
               </p>
             </div>
             <div class="d-flex align-items-center gap-2">
@@ -256,7 +283,7 @@ def index():
             </div>
           </div>
           <div id="chainMetrics" class="mb-2 small"></div>
-          <div id="graphNetwork" style="height: 380px; border: 1px solid #dee2e6; border-radius: 0.5rem; background-color: #fafbfc;"></div>
+          <div id="graphNetwork" style="height: 340px; border: 1px solid #dee2e6; border-radius: 0.5rem; background-color: #fafbfc;"></div>
           <div class="d-flex justify-content-between align-items-center mt-2 small text-muted">
             <div>
               <span class="badge bg-primary me-1">&nbsp;</span> Screening Clinic
@@ -427,7 +454,166 @@ def index():
     }
 
     // Load graph chains on page ready
-    window.addEventListener('DOMContentLoaded', loadGraphChains);
+    window.addEventListener('DOMContentLoaded', () => {
+      renderSvgComparisonGraph();
+      loadGraphChains();
+    });
+
+    const svgGraphNodes = [
+      { id: "SYN-PROV-MS-007", short: "MS-007 (Clinic)", wait: 6, x: 75, y: 115, color: "#38bdf8" },
+      { id: "SYN-PROV-MS-011", short: "MS-011 (Bounce Hub)", wait: 5, x: 265, y: 115, color: "#f59e0b", bounceHub: true },
+      { id: "SYN-PROV-MS-015", short: "MS-015 (Saturated Eval)", wait: 34, x: 470, y: 52, color: "#ef4444" },
+      { id: "SYN-PROV-MS-019", short: "MS-019 (Bilingual Eval)", wait: 7, x: 470, y: 145, color: "#a855f7" },
+      { id: "SYN-PROV-MS-028", short: "MS-028 (Therapy)", wait: 6, x: 675, y: 52, color: "#10b981" },
+      { id: "SYN-PROV-MS-027", short: "MS-027 (Therapy)", wait: 10, x: 675, y: 145, color: "#10b981" },
+      { id: "SYN-PROV-MS-026", short: "MS-026 (Therapy)", wait: 8, x: 675, y: 205, color: "#10b981" }
+    ];
+
+    const svgGraphPaths = {
+      bounce: {
+        id: "CHAIN-MS-023",
+        title: "🚨 CHAIN-MS-023: 4-Hop Paper-Fax Bounce (75 Days — Breaches 45d Limit!)",
+        subtitle: "32-month-old toddler (4 mos from 36m Part C aging-out cliff!) • Expressive/Autism Screen",
+        total: 75,
+        color: "#ef4444",
+        edges: [
+          { from: "SYN-PROV-MS-007", to: "SYN-PROV-MS-011", hop: 1, days: 14, chan: "paper_fax", dy: -12 },
+          { from: "SYN-PROV-MS-011", to: "SYN-PROV-MS-015", hop: 2, days: 22, chan: "paper_fax", dy: -8 },
+          { from: "SYN-PROV-MS-015", to: "SYN-PROV-MS-019", hop: 3, days: 25, chan: "paper_fax", dy: 0 },
+          { from: "SYN-PROV-MS-019", to: "SYN-PROV-MS-028", hop: 4, days: 14, chan: "ehr_portal", dy: -8 }
+        ]
+      },
+      eval: {
+        id: "CHAIN-MS-007",
+        title: "✅ CHAIN-MS-007: 3-Hop Electronic Bilingual Route (37 Days — Saves 38 Days!)",
+        subtitle: "Same Clinic (MS-007) & Same Coordinator (MS-011), routed via EHR directly to MS-019",
+        total: 37,
+        color: "#22c55e",
+        edges: [
+          { from: "SYN-PROV-MS-007", to: "SYN-PROV-MS-011", hop: 1, days: 6, chan: "ehr_portal", dy: 14 },
+          { from: "SYN-PROV-MS-011", to: "SYN-PROV-MS-019", hop: 2, days: 14, chan: "ehr_portal", dy: 10 },
+          { from: "SYN-PROV-MS-019", to: "SYN-PROV-MS-027", hop: 3, days: 17, chan: "ehr_portal", dy: 10 }
+        ]
+      },
+      fast: {
+        id: "CHAIN-MS-031",
+        title: "⚡ CHAIN-MS-031: 2-Hop Electronic Fast-Track (17 Days — Saves 58 Days!)",
+        subtitle: "Direct Fast-Track IFSP Placement for eligible toddlers via EHR Portal",
+        total: 17,
+        color: "#38bdf8",
+        edges: [
+          { from: "SYN-PROV-MS-007", to: "SYN-PROV-MS-011", hop: 1, days: 5, chan: "ehr_portal", dy: 18 },
+          { from: "SYN-PROV-MS-011", to: "SYN-PROV-MS-026", hop: 2, days: 12, chan: "ehr_portal", dy: 14 }
+        ]
+      }
+    };
+
+    let svgCurrentMode = "both";
+
+    function setSvgGraphMode(mode) {
+      svgCurrentMode = mode;
+      ["both", "bounce", "eval", "fast"].forEach(m => {
+        const btn = document.getElementById("btn-mode-" + m);
+        if (!btn) return;
+        btn.classList.toggle("active", m === mode);
+      });
+      renderSvgComparisonGraph();
+    }
+
+    function renderSvgComparisonGraph() {
+      const svg = document.getElementById("svgReferralGraph");
+      if (!svg) return;
+      const activeList = svgCurrentMode === "both" ? [svgGraphPaths.bounce, svgGraphPaths.eval] : [svgGraphPaths[svgCurrentMode]];
+      const nodeById = id => svgGraphNodes.find(n => n.id === id);
+
+      let html = `
+        <defs>
+          <marker id="arr-red" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#ef4444"/>
+          </marker>
+          <marker id="arr-green" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#22c55e"/>
+          </marker>
+          <marker id="arr-blue" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8"/>
+          </marker>
+        </defs>
+      `;
+
+      const headers = [
+        { x: 75, label: "1. Screening Clinic" },
+        { x: 265, label: "2. Part C Coordinator" },
+        { x: 470, label: "3. Multidisciplinary Eval Hub" },
+        { x: 675, label: "4. EI Therapy Vendor" }
+      ];
+      headers.forEach(h => {
+        html += `<text x="${h.x}" y="18" text-anchor="middle" font-size="10.5" font-weight="600" fill="#cbd5e1">${h.label}</text>`;
+      });
+
+      activeList.forEach(p => {
+        const markerId = p.color === "#ef4444" ? "arr-red" : (p.color === "#22c55e" ? "arr-green" : "arr-blue");
+        p.edges.forEach(e => {
+          const u = nodeById(e.from);
+          const v = nodeById(e.to);
+          const dash = e.chan === "paper_fax" ? 'stroke-dasharray="5,3"' : "";
+          const mx = (u.x + v.x) / 2 + (u.x === v.x ? 42 : 0);
+          const my = (u.y + v.y) / 2 + (e.dy || 0);
+          html += `
+            <path d="M ${u.x} ${u.y} Q ${mx} ${my} ${v.x} ${v.y}" fill="none" stroke="${p.color}" stroke-width="3" ${dash} marker-end="url(#${markerId})" opacity="0.95"/>
+            <rect x="${mx - 46}" y="${my - 9}" width="92" height="16" rx="4" fill="#1e293b" stroke="${p.color}" stroke-width="1"/>
+            <text x="${mx}" y="${my + 2}" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#f8fafc">H${e.hop}: +${e.days}d (${e.chan === 'paper_fax' ? 'FAX' : 'EHR'})</text>
+          `;
+        });
+      });
+
+      const usedIds = new Set();
+      activeList.forEach(p => p.edges.forEach(e => { usedIds.add(e.from); usedIds.add(e.to); }));
+
+      svgGraphNodes.forEach(n => {
+        const op = usedIds.has(n.id) ? "1.0" : "0.3";
+        const r = n.bounceHub ? 17 : 14;
+        const stroke = n.bounceHub ? "#ef4444" : "#0f172a";
+        html += `
+          <g opacity="${op}">
+            <circle cx="${n.x}" cy="${n.y}" r="${r}" fill="${n.color}" stroke="${stroke}" stroke-width="${n.bounceHub ? 3 : 2}"/>
+            <text x="${n.x}" y="${n.y + 3}" text-anchor="middle" font-size="8.5" font-weight="700" fill="#0f172a">${n.id.split('-').pop()}</text>
+            <text x="${n.x}" y="${n.y + r + 13}" text-anchor="middle" font-size="10" font-weight="600" fill="#f8fafc">${n.short}</text>
+            <text x="${n.x}" y="${n.y + r + 24}" text-anchor="middle" font-size="9" fill="#94a3b8">internal wait: ${n.wait}d</text>
+          </g>
+        `;
+      });
+
+      svg.innerHTML = html;
+
+      const cardsDiv = document.getElementById("svgClockCards");
+      if (cardsDiv) {
+        cardsDiv.innerHTML = activeList.map(p => {
+          const pct = Math.min(100, Math.round((p.total / 80) * 100));
+          const limitPct = Math.round((45 / 80) * 100);
+          const badge = p.total > 45
+            ? `<span class="badge badge-breach">+${p.total - 45}d BREACH</span>`
+            : `<span class="badge badge-pass">${45 - p.total}d UNDER 45d LIMIT</span>`;
+          return `
+            <div class="col-md-6">
+              <div class="border rounded p-3 bg-white h-100">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <strong class="small">${p.title}</strong>
+                  ${badge}
+                </div>
+                <div class="text-muted small mb-2">${p.subtitle}</div>
+                <div class="position-relative w-100 rounded overflow-hidden mb-2" style="height: 14px; background: #e2e8f0;">
+                  <div style="width:${pct}%; height:100%; background:${p.color};"></div>
+                  <div style="position:absolute; top:0; bottom:0; left:${limitPct}%; border-left: 2px dashed #d97706;" title="45-Day Statutory Ceiling"></div>
+                </div>
+                <div class="small font-monospace text-muted">
+                  ${p.edges.map(e => `H${e.hop}: ${e.from.split('-').pop()}→${e.to.split('-').pop()} (+${e.days}d ${e.chan})`).join(" • ")}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
+    }
 
     async function sendMessage() {
       const input = document.getElementById('userInput');
