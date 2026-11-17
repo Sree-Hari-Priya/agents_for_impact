@@ -606,7 +606,7 @@ def index():
                 <span id="geoMatchBadge" class="badge rounded-pill" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:0.7rem;">Auto-Resolving</span>
               </label>
               <div class="input-group input-group-sm mb-2">
-                <input type="text" id="geoInput" class="form-control" value="10451" placeholder="e.g. 10451, Bronx, Jamestown, Lockport, or 36005019700" oninput="debounceGeoResolve()">
+                <input type="text" id="geoInput" class="form-control" value="10451" placeholder="e.g. 10451, Bronx, Jamestown, Lockport, or 36005019700" oninput="debounceGeoResolve()" onchange="resolveLocationNow()" onkeydown="if(event.key==='Enter'){event.preventDefault();resolveLocationNow();}">
                 <button class="btn btn-outline-primary" type="button" onclick="resolveLocationNow()">
                   <i class="fa-solid fa-magnifying-glass-location"></i>
                 </button>
@@ -1790,6 +1790,7 @@ I partner with you to ensure every infant and toddler reaches their developmenta
     }
 
     function setGeoLocation(val) {
+      clearTimeout(geoDebounceTimer);
       document.getElementById('geoInput').value = val;
       resolveLocationNow();
     }
@@ -1841,6 +1842,8 @@ I partner with you to ensure every infant and toddler reaches their developmenta
           // Run pathway triage automatically
           runTriage();
         } else {
+          currentTriageRequestId++;
+          window.currentTriagePathway = null;
           // Explicit error handling for out-of-state ZIP / Tract / City or unrecognized location
           const errCode = data.error_code || 'LOCATION_ERROR';
           badge.className = 'badge bg-danger';
@@ -1887,9 +1890,9 @@ I partner with you to ensure every infant and toddler reaches their developmenta
 
     const UI_TRANSLATIONS = {
       en: {
-        triageTitle: '<i class="fa-solid fa-compass text-primary me-2"></i>Today\'s Referral Navigator',
+        triageTitle: '<i class="fa-solid fa-compass text-primary me-2"></i>Today&#39;s Referral Navigator',
         statutoryClock: 'Statutory Clock: 45 Days',
-        description: 'Enter the child\'s natural geographic location (ZIP Code, City, or Census Tract GEOID) to resolve nearest screening centers and calculate a guaranteed &le;45d IDEA Part C pathway.',
+        description: 'Enter the child&#39;s natural geographic location (ZIP Code, City, or Census Tract GEOID) to resolve nearest screening centers and calculate a guaranteed &le;45d IDEA Part C pathway.',
         geoLabel: '<i class="fa-solid fa-map-location-dot text-danger me-1"></i>Location (ZIP, City, or Census GEOID)',
         geoPlaceholder: 'e.g. 10451, Bronx, Jamestown, Lockport, or 36005019700',
         quickSelect: 'Quick Select:',
@@ -2116,13 +2119,23 @@ I partner with you to ensure every infant and toddler reaches their developmenta
       }
     }
 
+    let currentTriageRequestId = 0;
+
     async function runTriage() {
+      const geoid = document.getElementById('tractGeoid') ? document.getElementById('tractGeoid').value.trim() : '';
+      if (!geoid || !geoid.startsWith('36')) {
+        const graphCard = document.getElementById('triageGraphCard');
+        if (graphCard) graphCard.style.display = 'none';
+        return;
+      }
+
+      const reqId = ++currentTriageRequestId;
       const resultDiv = document.getElementById('triageResult');
       resultDiv.innerHTML = '<div class="text-center py-2"><i class="fa-solid fa-spinner fa-spin me-1"></i> Computing optimal graph pathway...</div>';
 
       const payload = {
         child_age_months: parseInt(document.getElementById('childAge').value),
-        census_tract_geoid: document.getElementById('tractGeoid').value,
+        census_tract_geoid: geoid,
         requires_medicaid: document.getElementById('reqMedicaid').checked,
         requires_bilingual: document.getElementById('reqBilingual').checked,
         max_wait_days: 45
@@ -2135,6 +2148,7 @@ I partner with you to ensure every infant and toddler reaches their developmenta
           body: JSON.stringify(payload)
         });
         const data = await res.json();
+        if (reqId !== currentTriageRequestId) return;
 
         if (data.recommended_pathways && data.recommended_pathways.length > 0) {
           const p = data.recommended_pathways[0];
