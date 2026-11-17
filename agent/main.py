@@ -838,7 +838,63 @@ I can help you resolve today's intake bottlenecks immediately:
     let sessionId = null;
     let activeState = "NY";
 
-    const STATE_DATA = {        ]
+    const STATE_DATA = {
+      NY: {
+        name: "New York (NY)",
+        county: "Bronx County",
+        tract: "36005019700",
+        nodes: [
+          { id: "SYN-PROV-NY-007", short: "NY-007 (Lockport Clinic)", wait: 6, x: 75, y: 115, color: "#38bdf8" },
+          { id: "SYN-PROV-NY-011", short: "NY-011 (Walton Bounce Hub)", wait: 5, x: 265, y: 115, color: "#f59e0b", bounceHub: true },
+          { id: "SYN-PROV-NY-015", short: "NY-015 (Canton Saturated)", wait: 34, x: 470, y: 52, color: "#ef4444" },
+          { id: "SYN-PROV-NY-019", short: "NY-019 (Lockport Bilingual)", wait: 7, x: 470, y: 145, color: "#a855f7" },
+          { id: "SYN-PROV-NY-028", short: "NY-028 (Malone Therapy)", wait: 6, x: 675, y: 52, color: "#10b981" },
+          { id: "SYN-PROV-NY-027", short: "NY-027 (Canton Therapy)", wait: 10, x: 675, y: 145, color: "#10b981" },
+          { id: "SYN-PROV-NY-026", short: "NY-026 (Jamestown Therapy)", wait: 8, x: 675, y: 205, color: "#10b981" }
+        ],
+        paths: {
+          bounce: {
+            id: "CHAIN-NY-023",
+            title: "🚨 CHAIN-NY-023: 4-Hop Paper-Fax Bounce (70 Days — Breaches 45d Limit!)",
+            subtitle: "32-month-old toddler (4 mos from 36m Part C aging-out cliff!) • Autism/Speech Screen",
+            total: 70,
+            color: "#ef4444",
+            edges: [
+              { from: "SYN-PROV-NY-007", to: "SYN-PROV-NY-011", hop: 1, days: 12, chan: "paper_fax", dy: -12 },
+              { from: "SYN-PROV-NY-011", to: "SYN-PROV-NY-015", hop: 2, days: 20, chan: "paper_fax", dy: -8 },
+              { from: "SYN-PROV-NY-015", to: "SYN-PROV-NY-019", hop: 3, days: 22, chan: "paper_fax", dy: 0 },
+              { from: "SYN-PROV-NY-019", to: "SYN-PROV-NY-028", hop: 4, days: 16, chan: "ehr_portal", dy: -8 }
+            ]
+          },
+          eval: {
+            id: "CHAIN-NY-007",
+            title: "✅ CHAIN-NY-007: 3-Hop Electronic Bilingual Route (40 Days — Saves 30 Days!)",
+            subtitle: "Same Clinic (NY-007) & Same Coordinator (NY-011), routed via EHR directly to NY-019",
+            total: 40,
+            color: "#22c55e",
+            edges: [
+              { from: "SYN-PROV-NY-007", to: "SYN-PROV-NY-011", hop: 1, days: 9, chan: "ehr_portal", dy: 14 },
+              { from: "SYN-PROV-NY-011", to: "SYN-PROV-NY-019", hop: 2, days: 14, chan: "ehr_portal", dy: 10 },
+              { from: "SYN-PROV-NY-019", to: "SYN-PROV-NY-027", hop: 3, days: 17, chan: "ehr_portal", dy: 10 }
+            ]
+          },
+          fast: {
+            id: "CHAIN-NY-031",
+            title: "⚡ CHAIN-NY-031: 2-Hop Electronic Fast-Track (22 Days — Saves 48 Days!)",
+            subtitle: "Direct Fast-Track IFSP Placement for eligible NY toddlers via EHR Portal",
+            total: 22,
+            color: "#38bdf8",
+            edges: [
+              { from: "SYN-PROV-NY-007", to: "SYN-PROV-NY-011", hop: 1, days: 8, chan: "ehr_portal", dy: 18 },
+              { from: "SYN-PROV-NY-011", to: "SYN-PROV-NY-026", hop: 2, days: 14, chan: "ehr_portal", dy: 14 }
+            ]
+          }
+        },
+        hubs: [
+          { name: "Walton Regional Intake Desk (SYN-PROV-NY-011)", wait: "5 days", list: 24, fax: "5 handoffs", breaches: "7 breaches (70+ days)", note: "Hidden bottleneck; low waitlist conceals paper-fax dropoffs." },
+          { name: "Bronx Regional Intake Desk (SYN-PROV-NY-012)", wait: "6 days", list: 29, fax: "5 handoffs", breaches: "7 breaches (70+ days)", note: "Urban high-volume re-referral hub with paper-fax delays." },
+          { name: "Canton Regional Intake Desk (SYN-PROV-NY-009)", wait: "8 days", list: 14, fax: "4 handoffs", breaches: "6 breaches (70+ days)", note: "North Country cross-county bounces into backlogged eval hubs." }
+        ]
       },
       MS: {
         name: "Mississippi (MS)",
