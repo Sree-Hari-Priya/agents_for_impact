@@ -142,55 +142,65 @@ The solution is hardened against all 12 planted traps:
 ## 6. Solution Architecture
 
 ```mermaid
-graph TD
-    subgraph UI_Layer ["Front-End Presentation Layer"]
-        Dashboard["Coordinator Web UI (Cloud Run /)"]
-        VisGraph["Interactive Vis.js Network Graph Visualizer"]
-        REST_API["REST Endpoints (/api/chat, /api/graph/breaches, /api/triage/route, /api/audit/equity)"]
+flowchart TB
+    subgraph Client ["Client / Caseworker Presentation Layer"]
+        User(["Regional IDEA Part C Intake & Quality Coordinator"])
+        UI["Cloud Run Web Dashboard<br/><i>(FastAPI · Leaflet Map · SVG Flow Graph)</i>"]
+        REST["REST Endpoints<br/><code>/api/chat · /api/triage/route · /api/graph/breaches · /api/audit/equity</code>"]
+        User <-->|"Bilingual Triage Query (EN/ES)"| UI
+        UI <--> REST
     end
 
-    subgraph Agent_Layer ["Google ADK Agent Framework"]
-        ADK["ADK Agent: early_intervention_triage_agent"]
-        LLM["Vertex AI Gemini 2.5 Flash"]
-        Memory["In-Memory Session Management"]
+    subgraph AgentOrchestration ["Google ADK Multi-Agent Orchestration Layer (agent/agent.py)"]
+        RootAgent["<b>Milestone Navigator (Maya)</b><br/><code>milestone_navigator_agent</code><br/><i>(Gemini 2.5 Flash Orchestrator)</i>"]
+        REST <--> RootAgent
+
+        subgraph Pipeline ["Sequential Triage & Brief Pipeline (brief_generator_pipeline)"]
+            RouterAgent["<b>1. Pathway Router Agent</b><br/><code>pathway_router_agent</code><br/>• Natural Geo Resolution (ZIP/City/GEOID)<br/>• 45-Day Route Optimization<br/>• 36-Month Age Cliff Guard"]
+            AuditAgent["<b>2. Network Audit Agent</b><br/><code>network_audit_agent</code><br/>• ISO GQL Variable-Length Hops (-{2,4}->)<br/>• Bounce Hub Diagnosis (Deceptive 5-Day Wait)<br/>• Counterfactual Electronic Fix Simulation"]
+            EquityAgent["<b>3. Equity & Transit Audit Agent</b><br/><code>equity_audit_agent</code><br/>• ACS Table B25044 Zero-Vehicle Deficit<br/>• High-Poverty Low-Screening Prioritization<br/>• NEMT / Mobile Unit Guardrail"]
+            CaregiverAgent["<b>4. Caregiver Note Agent</b><br/><code>caregiver_note_agent</code><br/>• Plain-Language Milestone Explanations<br/>• Bilingual English & Spanish Action Letters<br/>• 34 CFR § 303.310 Procedural Rights"]
+            
+            RouterAgent --> AuditAgent --> EquityAgent --> CaregiverAgent
+        end
+        RootAgent <--> Pipeline
     end
 
-    subgraph Tools_Layer ["Hardened Agent Tools (agent/tools.py)"]
-        T1["trace_45day_breaches_and_bounce_hubs - ISO GQL Multi-Hop Graph Traversal"]
-        T2["find_compliant_toddler_pathway - <=45d Route Optimizer & 36m Cliff Guard"]
-        T3["run_equity_and_counterfactual_audit - ACS + NSCH Equity Audit"]
-        T4["format_bilingual_caregiver_note - English & Spanish Action Letters"]
-        T5["validate_pre_handoff_packet - Pre-Handoff Eligibility & Intake Completeness"]
+    subgraph ToolsLayer ["Hardened Agent Tools & MCP Protocol (agent/tools.py)"]
+        T_Geo["<code>resolve_geographic_location_and_nearest_clinics</code><br/>ZIP / City / GEOID Centroid Spatial Match"]
+        T_Path["<code>find_compliant_toddler_pathway</code><br/>Clinic → Coordinator → Eval Hub → Vendor (<45d)"]
+        T_Breach["<code>trace_45day_breaches_and_bounce_hubs</code><br/>ISO GQL Variable-Length Multi-Hop Traversal"]
+        T_Fix["<code>simulate_single_network_fix</code><br/>Electronic EHR Upgrade Simulation & Days Saved"]
+        T_Valid["<code>validate_pre_handoff_packet</code><br/>Screening Screener & Bilingual Slot Verification"]
+        T_Equity["<code>run_equity_and_counterfactual_audit</code><br/>ACS Demographic Join & Vehicle Barrier Audit"]
+        T_Note["<code>format_bilingual_caregiver_note</code><br/>English & Spanish Personalized Action Notes"]
+        T_MCP["<b>Google-Managed BigQuery MCP / ADK Toolset</b><br/>Standardized JSON-RPC Query & Execution Protocol"]
+
+        RouterAgent --> T_Geo
+        RouterAgent --> T_Path
+        RouterAgent --> T_Valid
+        AuditAgent --> T_Breach
+        AuditAgent --> T_Fix
+        EquityAgent --> T_Equity
+        CaregiverAgent --> T_Note
+        RootAgent --> T_MCP
     end
 
-    subgraph MCP_Layer ["Model Context Protocol (MCP) Standards"]
-        MCP["Google Cloud BigQuery MCP Server / ADK Toolset Integration<br/>Standardized JSON-RPC Agent Tool Protocol"]
-    end
+    subgraph DataLayer ["Data & Graph Engine (Google Cloud BigQuery)"]
+        BQ_Graph[("<b>BigQuery Property Graph</b><br/><code>a4i_early_intervention.ReferralGraph</code><br/>• CareNode Vertices (30 Nodes)<br/>• ReferralHandoff Edges (149 Edges)<br/>• 44 Child Chains (correlating case_chain_id)")]
+        BQ_ACS[("<b>US Census Bureau ACS 5-Year</b><br/><code>acs_under5_tract_demographics</code><br/>• Under-5 Count, Poverty, Zero-Vehicle Rate")]
+        BQ_NSCH[("<b>HRSA NSCH Survey</b><br/><code>nsch_developmental_screening_survey</code><br/>• Statewide Screening Prevalence Baselines")]
+        BQ_Prov[("<b>Directory & Logs (100% Synthetic)</b><br/><code>pediatric_and_ei_provider_directory</code><br/><code>deidentified_part_c_referral_logs</code>")]
 
-    subgraph Data_Layer ["Google Cloud BigQuery"]
-        GQL["Property Graph: a4i_early_intervention.ReferralGraph<br/>CareNode (Vertices) & ReferralHandoff (Edges)"]
-        ACS["acs_under5_tract_demographics (Census Under-5, Poverty, Vehicle)"]
-        NSCH["nsch_developmental_screening_survey (HRSA Statewide Screening Baselines)"]
-        Providers["pediatric_and_ei_provider_directory (100% Synthetic Providers)"]
-        Logs["deidentified_part_c_referral_logs (Synthetic Multi-Hop Logs)"]
+        T_Path --> BQ_Graph
+        T_Breach --> BQ_Graph
+        T_Fix --> BQ_Graph
+        T_Geo --> BQ_ACS
+        T_Equity --> BQ_ACS
+        T_Equity --> BQ_NSCH
+        T_MCP --> BQ_Graph
+        T_MCP --> BQ_Prov
     end
-
-    Dashboard --> REST_API
-    VisGraph --> REST_API
-    REST_API --> ADK
-    ADK <--> LLM
-    ADK --> Memory
-    ADK --> T1
-    ADK --> T2
-    ADK --> T3
-    ADK --> T4
-    T1 --> GQL
-    T2 --> GQL
-    T2 --> ACS
-    T2 --> Providers
-    T3 --> Logs
-    T3 --> ACS
-    T3 --> NSCH
 ```
 
 ---

@@ -65,6 +65,74 @@ Every team shares the same spine: one BigQuery Property Graph (`a4i_early_interv
 
 ---
 
+## Multi-Agent Architecture
+
+Our solution, **Milestone Navigator (*Maya*)**, is powered by a hierarchical multi-agent architecture built with the **Google Agent Development Kit (ADK)** and **Vertex AI Gemini 2.5 Flash**, orchestrating specialized subagents over a **BigQuery Property Graph** (`ISO GQL`) and US Census ACS data layers:
+
+```mermaid
+flowchart TB
+    subgraph Client ["Client / Caseworker Presentation Layer"]
+        User(["Regional IDEA Part C Intake & Quality Coordinator"])
+        UI["Cloud Run Web Dashboard<br/><i>(FastAPI · Leaflet Map · SVG Flow Graph)</i>"]
+        REST["REST Endpoints<br/><code>/api/chat · /api/triage/route · /api/graph/breaches · /api/audit/equity</code>"]
+        User <-->|"Bilingual Triage Query (EN/ES)"| UI
+        UI <--> REST
+    end
+
+    subgraph AgentOrchestration ["Google ADK Multi-Agent Orchestration Layer"]
+        RootAgent["<b>Milestone Navigator (Maya)</b><br/><code>milestone_navigator_agent</code><br/><i>(Gemini 2.5 Flash Orchestrator)</i>"]
+        REST <--> RootAgent
+
+        subgraph Pipeline ["Sequential Triage & Brief Pipeline (brief_generator_pipeline)"]
+            RouterAgent["<b>1. Pathway Router Agent</b><br/><code>pathway_router_agent</code><br/>• Natural Geo Resolution (ZIP/City/GEOID)<br/>• 45-Day Route Optimization<br/>• 36-Month Age Cliff Guard"]
+            AuditAgent["<b>2. Network Audit Agent</b><br/><code>network_audit_agent</code><br/>• ISO GQL Variable-Length Hops (-{2,4}->)<br/>• Bounce Hub Diagnosis (Deceptive 5-Day Wait)<br/>• Counterfactual Electronic Fix Simulation"]
+            EquityAgent["<b>3. Equity & Transit Audit Agent</b><br/><code>equity_audit_agent</code><br/>• ACS Table B25044 Zero-Vehicle Deficit<br/>• High-Poverty Low-Screening Prioritization<br/>• NEMT / Mobile Unit Guardrail"]
+            CaregiverAgent["<b>4. Caregiver Note Agent</b><br/><code>caregiver_note_agent</code><br/>• Plain-Language Milestone Explanations<br/>• Bilingual English & Spanish Action Letters<br/>• 34 CFR § 303.310 Procedural Rights"]
+            
+            RouterAgent --> AuditAgent --> EquityAgent --> CaregiverAgent
+        end
+        RootAgent <--> Pipeline
+    end
+
+    subgraph ToolsLayer ["Hardened Agent Tools & MCP Protocol (agent/tools.py)"]
+        T_Geo["<code>resolve_geographic_location_and_nearest_clinics</code><br/>ZIP / City / GEOID Centroid Spatial Match"]
+        T_Path["<code>find_compliant_toddler_pathway</code><br/>Clinic → Coordinator → Eval Hub → Vendor (<45d)"]
+        T_Breach["<code>trace_45day_breaches_and_bounce_hubs</code><br/>ISO GQL Variable-Length Multi-Hop Traversal"]
+        T_Fix["<code>simulate_single_network_fix</code><br/>Electronic EHR Upgrade Simulation & Days Saved"]
+        T_Valid["<code>validate_pre_handoff_packet</code><br/>Screening Screener & Bilingual Slot Verification"]
+        T_Equity["<code>run_equity_and_counterfactual_audit</code><br/>ACS Demographic Join & Vehicle Barrier Audit"]
+        T_Note["<code>format_bilingual_caregiver_note</code><br/>English & Spanish Personalized Action Notes"]
+        T_MCP["<b>Google-Managed BigQuery MCP / ADK Toolset</b><br/>Standardized JSON-RPC Query & Execution Protocol"]
+
+        RouterAgent --> T_Geo
+        RouterAgent --> T_Path
+        RouterAgent --> T_Valid
+        AuditAgent --> T_Breach
+        AuditAgent --> T_Fix
+        EquityAgent --> T_Equity
+        CaregiverAgent --> T_Note
+        RootAgent --> T_MCP
+    end
+
+    subgraph DataLayer ["Data & Graph Engine (Google Cloud BigQuery)"]
+        BQ_Graph[("<b>BigQuery Property Graph</b><br/><code>a4i_early_intervention.ReferralGraph</code><br/>• CareNode Vertices (30 Nodes)<br/>• ReferralHandoff Edges (149 Edges)<br/>• 44 Child Chains (correlating case_chain_id)")]
+        BQ_ACS[("<b>US Census Bureau ACS 5-Year</b><br/><code>acs_under5_tract_demographics</code><br/>• Under-5 Count, Poverty, Zero-Vehicle Rate")]
+        BQ_NSCH[("<b>HRSA NSCH Survey</b><br/><code>nsch_developmental_screening_survey</code><br/>• Statewide Screening Prevalence Baselines")]
+        BQ_Prov[("<b>Directory & Logs (100% Synthetic)</b><br/><code>pediatric_and_ei_provider_directory</code><br/><code>deidentified_part_c_referral_logs</code>")]
+
+        T_Path --> BQ_Graph
+        T_Breach --> BQ_Graph
+        T_Fix --> BQ_Graph
+        T_Geo --> BQ_ACS
+        T_Equity --> BQ_ACS
+        T_Equity --> BQ_NSCH
+        T_MCP --> BQ_Graph
+        T_MCP --> BQ_Prov
+    end
+```
+
+---
+
 ## What you're building
 
 **An Early Intervention triage and network-audit assistant.** Not a static provider directory, and not a flat SQL join disguised as graph language, but a conversational ADK agent an IDEA Part C coordinator can work with live.
