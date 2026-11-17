@@ -67,26 +67,28 @@ def run_live_audit() -> None:
         title = page.title()
         print(f"[PASS] Page loaded in {load_sec}s | Title: {title}")
 
-        # 1. Verify Vis.js Graph & Breached Chains Dropdown
-        page.wait_for_function(
-            "document.querySelectorAll('#chainSelector option').length > 1",
-            timeout=20000,
-        )
-        chain_options = page.locator("#chainSelector option").all_inner_texts()
-        print(f"[PASS] Graph dropdown populated with {len(chain_options)} breached chains:")
-        print(f"       Top chain: {chain_options[0] if chain_options else 'N/A'}")
+        # 1. Verify Track Tab Navigation & SVG Clock Visualizer
+        # Test Track 2 switch
+        page.click("#btnTrack2")
+        page.wait_for_function("document.getElementById('trackPane2').classList.contains('active')")
+        svg_nodes = page.locator("#svgReferralGraph circle").count()
+        print(f"[PASS] Switched to Track 2 (This Quarter's Audit) | SVG ReferralGraph nodes rendered: {svg_nodes}")
 
-        # Select second chain to verify Vis.js interactive re-render
-        if len(chain_options) > 1:
-            page.select_option("#chainSelector", index=1)
-            page.wait_for_timeout(400)
-            metrics_text = page.locator("#chainMetrics").inner_text()
-            print(f"[PASS] Graph chain switch rendered metrics: {metrics_text}")
+        # Test Track 3 switch and dynamic equity table
+        page.click("#btnTrack3")
+        page.wait_for_function("document.getElementById('trackPane3').classList.contains('active')")
+        equity_rows = page.locator("#equityTableBody tr").count()
+        print(f"[PASS] Switched to Track 3 (Outreach Season) | Dynamic equity census tract rows: {equity_rows}")
+
+        # Switch back to Track 1
+        page.click("#btnTrack1")
+        page.wait_for_function("document.getElementById('trackPane1').classList.contains('active')")
+        print("[PASS] Switched to Track 1 (Today's Referral)")
 
         # 2. Test Quick Triage & Route Optimizer with 32-month-old (36m Aging-Out Cliff!)
         page.fill("#childAge", "32")
         page.fill("#tractGeoid", "28083950200")
-        page.click("button:has-text('Find Compliant Pathway')")
+        page.click("button:has-text('Calculate Compliant Pathway')")
         page.wait_for_function(
             "document.getElementById('triageResult').innerText.includes('Compliant Pathway')",
             timeout=20000,

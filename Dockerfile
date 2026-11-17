@@ -23,6 +23,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Copy application files
 COPY agent/ /app/agent/
+COPY data/ /app/data/
 
 ENV PORT=8080
 ENV PYTHONUNBUFFERED=1

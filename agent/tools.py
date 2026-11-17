@@ -31,7 +31,7 @@ from google.cloud import bigquery
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "qwiklabs-gcp-03-4b836a7f2e04")
 DATASET_ID = os.environ.get("A4I_DATASET", "a4i_early_intervention")
 LOCATION = os.environ.get("A4I_LOCATION", "US")
-DEFAULT_STATE = os.environ.get("A4I_STATE", "NY")
+DEFAULT_STATE = os.environ.get("A4I_STATE", "MS")
 
 FIPS_TO_STATE = {
     "01": "AL",
