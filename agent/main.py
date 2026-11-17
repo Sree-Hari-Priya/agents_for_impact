@@ -488,6 +488,14 @@ def index():
       transform: translateY(-1px);
       box-shadow: 0 4px 10px rgba(34, 197, 94, 0.15);
     }
+    .pastel-pill-chip:active,
+    .pastel-pill-chip.active {
+      background: #0284c7 !important;
+      border-color: #0284c7 !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35) !important;
+      transform: translateY(0);
+    }
   </style>
 </head>
 <body>
@@ -613,13 +621,13 @@ def index():
               </div>
               <div class="d-flex flex-wrap gap-1 mt-1 mb-1" style="font-size: 0.72rem;">
                 <span class="text-muted me-1 align-self-center" id="quickSelectLabel">Quick Select:</span>
-                <a href="javascript:void(0)" class="pastel-pill-chip" onclick="setGeoLocation('10451')">10451 (Bronx)</a>
-                <a href="javascript:void(0)" class="pastel-pill-chip" onclick="setGeoLocation('10025')">10025 (Manhattan)</a>
-                <a href="javascript:void(0)" class="pastel-pill-chip" onclick="setGeoLocation('14094')">14094 (Lockport)</a>
-                <a href="javascript:void(0)" class="pastel-pill-chip" onclick="setGeoLocation('13617')">13617 (Canton)</a>
-                <a href="javascript:void(0)" class="pastel-pill-chip" onclick="setGeoLocation('14701')">14701 (Jamestown)</a>
-                <a href="javascript:void(0)" class="pastel-pill-chip" onclick="setGeoLocation('13856')">13856 (Walton)</a>
-                <a href="javascript:void(0)" class="pastel-pill-chip" style="color:#be123c; border-color:#fecdd3; background:#fff1f2;" onclick="setGeoLocation('90210')">90210 (Test OOS)</a>
+                <button type="button" class="pastel-pill-chip quick-select-btn active" data-zip="10451" onclick="setGeoLocation('10451')">10451 (Bronx)</button>
+                <button type="button" class="pastel-pill-chip quick-select-btn" data-zip="10025" onclick="setGeoLocation('10025')">10025 (Manhattan)</button>
+                <button type="button" class="pastel-pill-chip quick-select-btn" data-zip="14094" onclick="setGeoLocation('14094')">14094 (Lockport)</button>
+                <button type="button" class="pastel-pill-chip quick-select-btn" data-zip="13617" onclick="setGeoLocation('13617')">13617 (Canton)</button>
+                <button type="button" class="pastel-pill-chip quick-select-btn" data-zip="14701" onclick="setGeoLocation('14701')">14701 (Jamestown)</button>
+                <button type="button" class="pastel-pill-chip quick-select-btn" data-zip="13856" onclick="setGeoLocation('13856')">13856 (Walton)</button>
+                <button type="button" class="pastel-pill-chip quick-select-btn" data-zip="90210" style="color:#be123c; border-color:#fecdd3; background:#fff1f2;" onclick="setGeoLocation('90210')">90210 (Test OOS)</button>
               </div>
               <div class="mt-2">
                 <label class="form-label small fw-semibold mb-1" style="font-size:0.75rem;" id="tractGeoidLabel">Census Tract GEOID</label>
@@ -675,31 +683,71 @@ def index():
                 <div id="triageResultPrompt">Click above or toggle any switch to calculate optimal graph routing.</div>
               </div>
             </div>
-
-            <!-- Agentic Pathway Graph Viz for Today's Child -->
-            <div id="triageGraphCard" class="card p-3 mt-3 border-0 bg-dark text-white" style="display: none; background: #0f172a; border-radius: 1.15rem; border: 1px solid #334155; box-shadow: 0 4px 20px rgba(15, 23, 42, 0.25);">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <h6 class="fw-bold mb-0 text-white" style="font-size: 0.85rem;" id="triageGraphTitle">
-                  <i class="fa-solid fa-diagram-project text-info me-1"></i> Pathway Handoff Graph (This Toddler)
-                </h6>
-                <div class="d-flex align-items-center gap-2">
-                  <div class="btn-group btn-group-sm" role="group" aria-label="Graph Language Toggle">
-                    <button type="button" id="btnGraphLangEn" class="btn btn-xs btn-primary active py-0 px-2 fw-bold" style="font-size: 0.7rem;" onclick="setGraphLanguage('en')">EN</button>
-                    <button type="button" id="btnGraphLangEs" class="btn btn-xs btn-outline-secondary py-0 px-2 fw-bold" style="font-size: 0.7rem;" onclick="setGraphLanguage('es')">ES</button>
-                  </div>
-                  <button type="button" class="btn btn-xs btn-outline-info py-0 px-2" style="font-size: 0.72rem;" onclick="centerMapOnCurrentPathway()" id="btnGraphViewMap">
-                    <i class="fa-solid fa-location-crosshairs me-1"></i> View on Map
-                  </button>
-                </div>
-              </div>
-              <svg id="svgTriagePathway" viewBox="0 0 680 130" class="w-100" style="background: #0f172a; border-radius: 8px;"></svg>
-            </div>
           </div>
         </div>
 
-        <!-- Live ADK Agent Interaction -->
-        <div class="col-lg-7">
-          <div class="card p-4 h-100" style="background: linear-gradient(180deg, #fdfbf7 0%, #ffffff 100%); border-radius: 1.25rem;">
+        <!-- Geospatial Overlay (Physical Map) ABOVE Agent Flow Map -->
+        <div class="col-lg-7 d-flex flex-column gap-3">
+          <!-- Card 1: Physical Map of NY (ABOVE) -->
+          <div class="card p-3 border shadow-sm" style="background: #ffffff; border-radius: 1.25rem;">
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
+              <div>
+                <h6 id="mapCardTitle" class="card-title mb-0 fw-bold d-flex align-items-center text-dark">
+                  <i class="fa-solid fa-earth-americas text-primary me-2"></i>Physical Map of New York (NY)
+                  <span class="badge rounded-pill ms-2" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:0.7rem;">Live Referral Overlay</span>
+                </h6>
+                <small class="text-muted" style="font-size:0.73rem;">30 CareNode providers &amp; 89 NY Census tracts (USGS National Map · 100% Public Domain US Gov)</small>
+              </div>
+              <div class="d-flex flex-wrap gap-1">
+                <div class="btn-group btn-group-sm" role="group">
+                  <button type="button" class="btn btn-xs btn-outline-primary active" id="btnZoomState" onclick="zoomMapRegion('state', this)">🗺️ State</button>
+                  <button type="button" class="btn btn-xs btn-outline-primary" id="btnZoomBronx" onclick="zoomMapRegion('bronx', this)">🏙️ Bronx</button>
+                  <button type="button" class="btn btn-xs btn-outline-primary" id="btnZoomCatskills" onclick="zoomMapRegion('catskills', this)">⛰️ Upstate</button>
+                  <button type="button" class="btn btn-xs btn-outline-secondary" id="btnToggleTracts" onclick="toggleTractLayer(this)">📍 89 Tracts</button>
+                </div>
+              </div>
+            </div>
+            <div id="nyPhysicalMap" style="height: 310px; width: 100%; border-radius: 0.75rem; border: 1px solid #cbd5e1;"></div>
+            <div class="d-flex flex-wrap justify-content-between align-items-center mt-2 small text-muted" style="font-size:0.72rem;">
+              <div>
+                <span class="badge" style="background:#38bdf8; color:#0f172a;">●</span> Clinic (8)
+                <span class="badge ms-1" style="background:#f59e0b; color:#0f172a;">●</span> Coordinator (4)
+                <span class="badge ms-1" style="background:#a855f7; color:#fff;">●</span> Eval Hub (8)
+                <span class="badge ms-1" style="background:#10b981; color:#0f172a;">●</span> Therapy (10)
+                <span class="badge ms-1" style="background:#f43f5e; color:#fff;">○</span> High Zero-Vehicle
+              </div>
+              <div class="font-monospace">
+                <span style="color:#ef4444; font-weight:bold;">━━ Fax Bounce (70d)</span> &nbsp;|&nbsp;
+                <span style="color:#22c55e; font-weight:bold;">━━ &le;45d Route (40d / 22d)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: Agent Flow Map (DIRECTLY UNDER PHYSICAL MAP) -->
+          <div id="triageGraphCard" class="card p-3 border-0 bg-dark text-white" style="display: none; background: #0f172a; border-radius: 1.25rem; border: 1px solid #334155; box-shadow: 0 4px 20px rgba(15, 23, 42, 0.25);">
+            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-secondary border-opacity-25">
+              <h6 class="fw-bold mb-0 text-white d-flex align-items-center" style="font-size: 0.88rem;" id="triageGraphTitle">
+                <i class="fa-solid fa-diagram-project text-info me-2"></i> Agent Flow Map — Care Pathway Handoffs
+              </h6>
+              <div class="d-flex align-items-center gap-2">
+                <div class="btn-group btn-group-sm" role="group" aria-label="Graph Language Toggle">
+                  <button type="button" id="btnGraphLangEn" class="btn btn-xs btn-primary active py-0 px-2 fw-bold" style="font-size: 0.7rem;" onclick="setGraphLanguage('en')">EN</button>
+                  <button type="button" id="btnGraphLangEs" class="btn btn-xs btn-outline-secondary py-0 px-2 fw-bold" style="font-size: 0.7rem;" onclick="setGraphLanguage('es')">ES</button>
+                </div>
+                <button type="button" class="btn btn-xs btn-outline-info py-0 px-2" style="font-size: 0.72rem;" onclick="centerMapOnCurrentPathway()" id="btnGraphViewMap">
+                  <i class="fa-solid fa-location-crosshairs me-1"></i> View on Map
+                </button>
+              </div>
+            </div>
+            <svg id="svgTriagePathway" viewBox="0 0 540 330" class="w-100" style="background: #0f172a; border-radius: 8px;"></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live ADK Agent Interaction (Milestone Navigator) -->
+      <div class="row mt-4">
+        <div class="col-12">
+          <div class="card p-4 border shadow-sm" style="background: linear-gradient(180deg, #fdfbf7 0%, #ffffff 100%); border-radius: 1.25rem;">
             <div class="d-flex align-items-center justify-content-between mb-3">
               <div>
                 <h5 class="card-title mb-0 fw-bold"><i class="fa-solid fa-heart-pulse text-danger me-2"></i>Milestone Navigator</h5>
@@ -1278,46 +1326,6 @@ I partner with you to ensure every infant and toddler reaches their developmenta
         </div>
       </div>
     </div>
-
-    <!-- ========================================== -->
-    <!-- ALWAYS-ON GEOSPATIAL OVERLAY: PHYSICAL MAP OF NY + REFERRALGRAPH -->
-    <!-- ========================================== -->
-    <div class="row mt-4">
-      <div class="col-12">
-        <div class="card p-4">
-          <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-            <div>
-              <h5 id="mapCardTitle" class="card-title mb-1 fw-bold"><i class="fa-solid fa-earth-americas text-primary me-2"></i>Physical Map of New York (NY) — ReferralGraph &amp; 89 Census Tracts Overlay</h5>
-              <p class="text-muted small mb-0">
-                30 <code>CareNode</code> providers &amp; 89 real US Census tracts overlaid on <strong>USGS National Map (100% Public Domain US Gov — Zero OpenStreetMap ODbL)</strong>. Shows how a Bronx referral bounces hundreds of miles upstate when local bilingual slots saturate.
-              </p>
-            </div>
-            <div class="d-flex flex-wrap gap-2">
-              <div class="btn-group btn-group-sm" role="group">
-                <button type="button" class="btn btn-outline-primary" onclick="zoomMapRegion('state')">🗺️ Full State View</button>
-                <button type="button" class="btn btn-outline-primary" onclick="zoomMapRegion('bronx')">🏙️ Bronx / NYC Cluster</button>
-                <button type="button" class="btn btn-outline-primary" onclick="zoomMapRegion('catskills')">⛰️ Catskills / Upstate Eval</button>
-                <button type="button" class="btn btn-outline-secondary" onclick="toggleTractLayer()">📍 Toggle 89 Tracts</button>
-              </div>
-            </div>
-          </div>
-          <div id="nyPhysicalMap" style="height: 460px; width: 100%; border-radius: 0.75rem; border: 1px solid #cbd5e1;"></div>
-          <div class="d-flex flex-wrap justify-content-between align-items-center mt-2 small text-muted">
-            <div>
-              <span class="badge" style="background:#38bdf8; color:#0f172a;">●</span> Screening Clinic (8)
-              <span class="badge ms-1" style="background:#f59e0b; color:#0f172a;">●</span> Part C Intake Coordinator / Bounce Hub (4)
-              <span class="badge ms-1" style="background:#a855f7; color:#fff;">●</span> Multidisciplinary Eval Hub (8)
-              <span class="badge ms-1" style="background:#10b981; color:#0f172a;">●</span> EI Therapy Vendor (10)
-              <span class="badge ms-1" style="background:#f43f5e; color:#fff;">○</span> High Zero-Vehicle Tract
-            </div>
-            <div class="font-monospace">
-              <span style="color:#ef4444; font-weight:bold;">━━━ 4-Hop Fax Bounce (70d)</span> &nbsp;|&nbsp;
-              <span style="color:#22c55e; font-weight:bold;">━━━ &le;45d E-Referral Route (40d / 22d)</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- Modal: Bilingual Caregiver Action Note -->
@@ -1492,6 +1500,9 @@ I partner with you to ensure every infant and toddler reaches their developmenta
         const simEl = document.getElementById('simResultsArea');
         if (simEl) simEl.scrollIntoView({ behavior: 'smooth' });
       }
+      if (leafletMap) {
+        setTimeout(() => leafletMap.invalidateSize(), 150);
+      }
     }
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -1525,6 +1536,7 @@ I partner with you to ensure every infant and toddler reaches their developmenta
       const el = document.getElementById('nyPhysicalMap');
       if (!el || typeof L === 'undefined') return;
       leafletMap = L.map('nyPhysicalMap', { preferCanvas: true }).setView([42.65, -75.4], 7);
+      window.leafletMap = leafletMap;
       // 100% Public Domain US Federal Government Basemap (USGS National Map — zero OpenStreetMap ODbL)
       L.tileLayer(
         'https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}',
@@ -1535,6 +1547,7 @@ I partner with you to ensure every infant and toddler reaches their developmenta
       ).addTo(leafletMap);
       mapTractLayer = L.layerGroup().addTo(leafletMap);
       mapGraphLayer = L.layerGroup().addTo(leafletMap);
+      setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 200);
     }
 
     async function loadStatePhysicalMap(st) {
@@ -1550,10 +1563,18 @@ I partner with you to ensure every infant and toddler reaches their developmenta
       }
     }
 
-    function zoomMapRegion(region) {
+    function zoomMapRegion(region, btnEl) {
       if (!leafletMap) return;
+      if (btnEl) {
+        ['btnZoomState', 'btnZoomBronx', 'btnZoomCatskills'].forEach(id => {
+          const b = document.getElementById(id);
+          if (b) b.classList.remove('active');
+        });
+        btnEl.classList.add('active');
+      }
       if (activeState === 'MS') {
         leafletMap.setView([33.35, -90.45], region === 'state' ? 8 : 10);
+        leafletMap.invalidateSize();
         return;
       }
       if (region === 'bronx') {
@@ -1563,11 +1584,27 @@ I partner with you to ensure every infant and toddler reaches their developmenta
       } else {
         leafletMap.setView([42.65, -75.5], 7);
       }
+      leafletMap.invalidateSize();
     }
 
-    function toggleTractLayer() {
+    function toggleTractLayer(btnEl) {
       showTractsOnMap = !showTractsOnMap;
+      if (btnEl) {
+        btnEl.classList.toggle('active', showTractsOnMap);
+        btnEl.classList.toggle('btn-outline-secondary', !showTractsOnMap);
+        btnEl.classList.toggle('btn-secondary', showTractsOnMap);
+      }
       renderPhysicalMapOverlay();
+    }
+
+    function locateClinicOnMap(lat, lon, name) {
+      if (leafletMap || window.leafletMap) {
+        const m = leafletMap || window.leafletMap;
+        const mapEl = document.getElementById('nyPhysicalMap');
+        if (mapEl) mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        m.flyTo([lat, lon], 13, { animate: true, duration: 1.0 });
+        L.popup().setLatLng([lat, lon]).setContent(`<strong>${name}</strong><br><span class="badge bg-primary">Nearest Screening Center</span>`).openOn(m);
+      }
     }
 
     function renderPhysicalMapOverlay() {
@@ -1789,8 +1826,15 @@ I partner with you to ensure every infant and toddler reaches their developmenta
       }, 400);
     }
 
-    function setGeoLocation(val) {
+    function setGeoLocation(val, btnEl) {
       clearTimeout(geoDebounceTimer);
+      document.querySelectorAll('.quick-select-btn').forEach(b => b.classList.remove('active'));
+      if (btnEl) {
+        btnEl.classList.add('active');
+      } else {
+        const matchingBtn = document.querySelector(`.quick-select-btn[data-zip="${val}"]`);
+        if (matchingBtn) matchingBtn.classList.add('active');
+      }
       document.getElementById('geoInput').value = val;
       resolveLocationNow();
     }
@@ -1818,7 +1862,7 @@ I partner with you to ensure every infant and toddler reaches their developmenta
           badge.className = 'badge bg-success';
           badge.innerText = data.match_type.replace('_', ' ');
 
-          // Render closest screening centers list
+          // Render closest screening centers list with instant map locator buttons
           const listDiv = document.getElementById('closestClinicsList');
           if (data.nearest_screening_clinics && data.nearest_screening_clinics.length > 0) {
             listDiv.innerHTML = data.nearest_screening_clinics.map((c, i) => `
@@ -1829,14 +1873,21 @@ I partner with you to ensure every infant and toddler reaches their developmenta
                     Wait: ${c.internal_wait_days}d · ${c.bilingual_services_listed ? 'Bilingual ✅' : 'English only'} · ${c.accepts_medicaid ? 'Medicaid ✅' : 'No Medicaid'}
                   </div>
                 </div>
-                <span class="badge bg-primary-subtle text-primary border">${c.distance_miles} mi</span>
+                <div class="d-flex align-items-center gap-1">
+                  <span class="badge bg-primary-subtle text-primary border">${c.distance_miles} mi</span>
+                  <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2 rounded-pill" onclick="locateClinicOnMap(${c.latitude || 40.81}, ${c.longitude || -73.92}, '${c.name.replace(/'/g, "\\'")}')" title="Locate on Map">
+                    <i class="fa-solid fa-location-crosshairs"></i>
+                  </button>
+                </div>
               </div>
             `).join('');
           }
 
-          // Pan/Zoom Leaflet map if initialized
-          if (window.leafletMap && loc.latitude && loc.longitude) {
-            window.leafletMap.setView([loc.latitude, loc.longitude], 12);
+          // Pan/Zoom Leaflet map smoothly to resolved location
+          const m = leafletMap || window.leafletMap;
+          if (m && loc.latitude && loc.longitude) {
+            m.flyTo([loc.latitude, loc.longitude], 12, { animate: true, duration: 0.8 });
+            setTimeout(() => m.invalidateSize(), 150);
           }
 
           // Run pathway triage automatically
@@ -2044,8 +2095,8 @@ I partner with you to ensure every infant and toddler reaches their developmenta
       const graphTitle = document.getElementById('triageGraphTitle');
       if (graphTitle) {
         graphTitle.innerHTML = isEs
-          ? '<i class="fa-solid fa-diagram-project text-info me-1"></i> Gráfico de Transición del Plan de Derivación (Este Menor)'
-          : '<i class="fa-solid fa-diagram-project text-info me-1"></i> Pathway Handoff Graph (This Toddler)';
+          ? '<i class="fa-solid fa-diagram-project text-info me-2"></i> Mapa de Flujo de Agentes — Derivación de Cuidados'
+          : '<i class="fa-solid fa-diagram-project text-info me-2"></i> Agent Flow Map — Care Pathway Handoffs';
       }
       const btnMap = document.getElementById('btnGraphViewMap');
       if (btnMap) {
@@ -2054,68 +2105,84 @@ I partner with you to ensure every infant and toddler reaches their developmenta
           : '<i class="fa-solid fa-location-crosshairs me-1"></i> View on Map';
       }
 
-      // 4 stages: Screening Clinic -> Coordinator -> Eval Hub -> Vendor
+      svg.setAttribute('viewBox', '0 0 540 330');
+
+      // 4 stages arranged VERTICALLY from top to bottom
       const nodes = [
-        { label: isEs ? "Clínica de Detección" : "Screening Clinic", name: p.screening_clinic.replace(' [Synthetic]', ''), days: p.clinic_wait, x: 80, y: 55, color: "#7dd3fc" },
-        { label: isEs ? "Coordinador Parte C" : "Part C Coordinator", name: p.intake_coordinator.replace(' [Synthetic]', ''), days: p.coord_wait, x: 260, y: 55, color: "#fde047" },
-        { label: isEs ? (p.eval_bilingual ? "Centro Eval. Bilingüe" : "Centro de Evaluación") : "Multidisc. Eval Hub", name: p.eval_hub.replace(' [Synthetic]', ''), days: p.eval_wait, x: 440, y: 55, color: p.eval_bilingual ? "#c084fc" : "#93c5fd" },
-        { label: isEs ? "Proveedor de Terapia" : "Direct Therapy Vendor", name: p.therapy_vendor.replace(' [Synthetic]', ''), days: p.vendor_wait, x: 610, y: 55, color: "#86efac" }
+        { label: isEs ? "Clínica de Detección" : "Screening Clinic", step: isEs ? "Paso 1" : "Stage 1", name: p.screening_clinic.replace(' [Synthetic]', ''), days: p.clinic_wait, y: 38, color: "#7dd3fc" },
+        { label: isEs ? "Coordinador Parte C" : "Part C Coordinator", step: isEs ? "Paso 2" : "Stage 2", name: p.intake_coordinator.replace(' [Synthetic]', ''), days: p.coord_wait, y: 104, color: "#fde047" },
+        { label: isEs ? (p.eval_bilingual ? "Centro Eval. Bilingüe" : "Centro de Evaluación") : "Multidisc. Eval Hub", step: isEs ? "Paso 3" : "Stage 3", name: p.eval_hub.replace(' [Synthetic]', ''), days: p.eval_wait, y: 170, color: p.eval_bilingual ? "#c084fc" : "#93c5fd" },
+        { label: isEs ? "Proveedor de Terapia" : "Direct Therapy Vendor", step: isEs ? "Paso 4" : "Stage 4", name: p.therapy_vendor.replace(' [Synthetic]', ''), days: p.vendor_wait, y: 236, color: "#86efac" }
       ];
 
       let svgHtml = `
         <defs>
-          <marker id="arrow-flow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#38bdf8"/>
+          <marker id="arrow-flow-v" viewBox="0 0 10 10" refX="5" refY="8" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M 0 0 L 10 0 L 5 8 z" fill="#38bdf8"/>
           </marker>
         </defs>
       `;
 
-      // Draw 3 connector hops
+      // Draw vertical connector lines and hop badges between stages
       for (let i = 0; i < 3; i++) {
         const u = nodes[i];
         const v = nodes[i + 1];
-        const midX = (u.x + v.x) / 2;
-        const hopLabel = isEs ? `Salto EHR ${i+1}` : `EHR Hop ${i+1}`;
+        const midY = (u.y + v.y) / 2 + 3;
+        const hopLabel = isEs ? `Salto EHR ${i + 1}` : `EHR Hop ${i + 1}`;
         svgHtml += `
-          <line x1="${u.x + 22}" y1="${u.y}" x2="${v.x - 22}" y2="${v.y}" stroke="#38bdf8" stroke-width="2.5" marker-end="url(#arrow-flow)"/>
-          <rect x="${midX - 32}" y="32" width="64" height="15" rx="3" fill="#1e293b" stroke="#38bdf8" stroke-width="0.8"/>
-          <text x="${midX}" y="43" fill="#38bdf8" font-size="8.5" font-family="monospace" text-anchor="middle" font-weight="bold">${hopLabel}</text>
+          <line x1="42" y1="${u.y + 17}" x2="42" y2="${v.y - 17}" stroke="#38bdf8" stroke-width="2.5" marker-end="url(#arrow-flow-v)"/>
+          <text x="56" y="${midY}" fill="#38bdf8" font-size="8.5" font-family="monospace" font-weight="bold">▼ ${hopLabel} (+${nodes[i].days}d)</text>
         `;
       }
 
-      // Draw stage circles and labels
+      // Draw stage circles and stage info cards
       nodes.forEach((n, idx) => {
         svgHtml += `
           <g>
-            <circle cx="${n.x}" cy="${n.y}" r="18" fill="${n.color}" stroke="#ffffff" stroke-width="2.2" filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.4))"/>
-            <text x="${n.x}" y="${n.y + 4}" fill="#0f172a" font-size="9" font-weight="900" text-anchor="middle">${idx + 1}</text>
-            <text x="${n.x}" y="${n.y + 32}" fill="#f8fafc" font-size="8.5" font-weight="bold" text-anchor="middle">${n.label}</text>
-            <text x="${n.x}" y="${n.y + 44}" fill="#94a3b8" font-size="7.5" text-anchor="middle">${n.name.substring(0, 18)}</text>
-            <text x="${n.x}" y="${n.y - 25}" fill="#38bdf8" font-size="8.5" font-family="monospace" text-anchor="middle">+${n.days}d</text>
+            <!-- Vertical Stage Circle -->
+            <circle cx="42" cy="${n.y}" r="17" fill="${n.color}" stroke="#ffffff" stroke-width="2.2" filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.4))"/>
+            <text x="42" y="${n.y + 4}" fill="#0f172a" font-size="10" font-weight="900" text-anchor="middle">${idx + 1}</text>
+
+            <!-- Stage Card -->
+            <rect x="70" y="${n.y - 21}" width="455" height="42" rx="8" fill="#1e293b" stroke="${n.color}" stroke-width="1.2"/>
+            <text x="84" y="${n.y - 5}" fill="${n.color}" font-size="9.5" font-weight="bold">${n.step} · ${n.label}</text>
+            <text x="84" y="${n.y + 12}" fill="#f8fafc" font-size="10.5" font-weight="600">${n.name.substring(0, 42)}</text>
+            
+            <!-- Wait Days Badge -->
+            <rect x="440" y="${n.y - 13}" width="72" height="24" rx="6" fill="#0f172a" stroke="#38bdf8" stroke-width="1"/>
+            <text x="476" y="${n.y + 3}" fill="#38bdf8" font-size="10" font-family="monospace" font-weight="bold" text-anchor="middle">+${n.days}d</text>
           </g>
         `;
       });
 
-      // Total clock summary tag in top right
+      // Total clock summary tag at bottom
       const clockSummary = isEs
-        ? `❤️ Protección 45d: ${p.total_estimated_wait_days}d`
-        : `❤️ 45d Protected: ${p.total_estimated_wait_days}d (≤45d)`;
+        ? `❤️ Protección de Plazo Legal 45d: ${p.total_estimated_wait_days} Días (${45 - p.total_estimated_wait_days}d bajo el límite)`
+        : `❤️ 45-Day Statutory Protection: ${p.total_estimated_wait_days} Total Days (${45 - p.total_estimated_wait_days}d under federal limit)`;
       svgHtml += `
-        <rect x="490" y="8" width="180" height="22" rx="11" fill="#065f46" stroke="#34d399" stroke-width="1.5"/>
-        <text x="580" y="23" fill="#ecfdf5" font-size="8.8" font-weight="bold" text-anchor="middle">${clockSummary}</text>
+        <rect x="18" y="278" width="504" height="34" rx="8" fill="#064e3b" stroke="#34d399" stroke-width="1.5"/>
+        <text x="270" y="299" fill="#ecfdf5" font-size="10.8" font-weight="bold" text-anchor="middle">${clockSummary}</text>
       `;
 
       svg.innerHTML = svgHtml;
     }
 
     function centerMapOnCurrentPathway() {
-      // Activate Track 2 map or scroll to map
-      if (window.leafletMap) {
-        activateTrack(2);
-        const mapEl = document.getElementById('map');
+      const m = leafletMap || window.leafletMap;
+      if (m) {
+        const mapEl = document.getElementById('nyPhysicalMap');
         if (mapEl) {
-          mapEl.scrollIntoView({ behavior: 'smooth' });
+          mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
+        const geoid = document.getElementById('tractGeoid') ? document.getElementById('tractGeoid').value.trim() : '';
+        if (geoid.startsWith('36005')) {
+          zoomMapRegion('bronx');
+        } else if (geoid.startsWith('36089') || geoid.startsWith('36063')) {
+          zoomMapRegion('catskills');
+        } else {
+          zoomMapRegion('state');
+        }
+        setTimeout(() => m.invalidateSize(), 150);
       }
     }
 
