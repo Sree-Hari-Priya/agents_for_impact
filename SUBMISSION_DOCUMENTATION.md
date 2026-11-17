@@ -1,25 +1,141 @@
-# First Milestones: IDEA Part C Triage & Network-Audit Assistant
+# Challenge 04: Early Intervention & Developmental Screening Triage ("First Milestones")
 **Agents for Impact 2026 Challenge Submission**
 
 - **Live Deployed Cloud Run Application**: [https://early-intervention-triage-584075988667.us-central1.run.app](https://early-intervention-triage-584075988667.us-central1.run.app)
+- **GitHub Repository**: [https://github.com/Sree-Hari-Priya/agents_for_impact](https://github.com/Sree-Hari-Priya/agents_for_impact)
 - **Architecture**: Google ADK Agent (`gemini-2.5-flash`) + BigQuery Property Graph (ISO GQL) + Cloud Run (FastAPI + Vis.js)
 - **Target State**: Mississippi (`MS`)
 - **Dataset**: `qwiklabs-gcp-03-4b836a7f2e04:a4i_early_intervention` (US Multi-Region)
 
 ---
 
-## 1. Problem Statement: The 45-Day IDEA Part C Statutory Clock
+## 1. Challenge Overview & Problem Statement
 
-Federal law (IDEA Part C, 34 CFR § 303.310) mandates that states must complete developmental evaluation and an Individualized Family Service Plan (IFSP) within **45 calendar days** of an infant or toddler referral (aged 0–35 months).
+### The 45-Day Federal Statutory Clock
+Federal law (IDEA Part C, 34 CFR § 303.310) mandates that states must deliver a comprehensive multidisciplinary developmental evaluation and an initial **Individualized Family Service Plan (IFSP)** within **forty-five calendar days** from the moment an infant or toddler (aged 0–35 months) is referred for a developmental concern.
 
-In rural and high-poverty regions, children routinely exceed day 45 without an evaluation. When coordinators inspect flat provider spreadsheets, the root cause is invisible:
-- **The Flat SQL Waitlist Illusion**: A flat SQL sort highlights busy downstream evaluation hubs with long waitlists. But these are merely symptoms at hop 2 or 3.
-- **The Systemic "Bounce Hub"**: Intake Coordinator Hubs (e.g., `Indianola Regional Intake Desk SYN-PROV-MS-011`) maintain an apparently healthy internal wait of only **5 days**. However, because they transmit via `paper_fax` into non-bilingual or mismatched hubs, packets repeatedly bounce.
-- **The Real Delay**: Variable-length graph traversal reveals that this single hub is directly involved in **7 statutory breaches of 70+ days each** across 5 paper-fax handoffs.
+Speech, motor, or autism intervention delivered before age two changes a child's developmental trajectory far more than starting the same support in kindergarten. Yet across rural and high-poverty regions, thousands of two-year-olds blow past day 45 without ever seeing an evaluator.
+
+### The Challenge
+Regional Early Intervention programs know their 45-day compliance rate is slipping in the abstract. What they cannot see from a flat provider directory is where a child's referral chain actually breaks:
+- A paper fax from a screening clinic to an intake hub.
+- A forward from the intake hub to a backlogged evaluation hub.
+- A third bounce when a Medicaid or Spanish-language credential is missing.
+
+By hop three or four, 70+ days have vanished. When coordinators inspect flat provider spreadsheets, the problem is obscured:
+- **The Flat SQL Waitlist Illusion**: A flat SQL sort highlights busy downstream evaluation clinics with long waitlists. These are merely symptoms at hop 2 and hop 3.
+- **The Systemic "Bounce Hub"**: An intake hub whose internal wait time looks healthy (**5 to 6 days**) repeatedly transmits packets via `paper_fax` into mismatched providers, silently triggering multi-hop cascading breaches across an entire region.
 
 ---
 
-## 2. Solution Architecture & Technical Stack
+## 2. Your Mission & Three-Track Coverage
+
+We built a conversational triage and routing assistant for an Early Intervention intake coordinator at the Department of Developmental Services. It is not merely a dashboard or a single query with a chat box; it is an intelligent agent capable of holding a working dialogue and reaching for real neighborhood census context.
+
+Our assistant addresses all three challenge tracks within a single unified architecture:
+
+### Track 1: Today's Referral (<=45-Day Pathway Discovery)
+- **Scenario**: A 20-month-old (or age-out risk toddler) requires bilingual developmental evaluation under Medicaid in Leflore County (Tract `28083950200`).
+- **Agent Action**: Matches child home tract, Medicaid enrollment, and language needs against `CareNode` properties to compute a compliant prospective route clearing the 45-day federal clock.
+- **Result**: Finds an optimal 4-hop pathway completed in **22 total days** (saving 54 days compared to breached historical chains), with total transit distance of 177.8 miles.
+- **Age-Out Cliff Protection**: Automatically flags any toddler $\ge 30$ months with an urgent priority escalation notice before they age out of Part C at 36 months.
+
+### Track 2: This Quarter's Audit (Systemic Bottleneck Hub Identification)
+- **Scenario**: Across 2-to-4-hop referral chains, identify which single bottleneck hub is silently breaking the 45-day mandate for the entire region.
+- **Agent Action**: Traverses the BigQuery Property Graph using variable-length ISO GQL (`CareNode-[hops:ReferralHandoff]->{2,4}`) correlating on `case_chain_id`.
+- **Result**: Pinpoints **Indianola Regional Part C Intake Desk (`SYN-PROV-MS-011`)** and **Jackson Regional Intake Desk (`SYN-PROV-MS-012`)**. Despite boasting deceptive 5–6 day internal waitlists, their reliance on `paper_fax` handoffs directly causes **7 statutory breaches (70+ days cumulative wait)** each.
+
+### Track 3: This Outreach Season (Community Screening Prioritization)
+- **Scenario**: Combine under-five neighborhood poverty, vehicle access, and statewide screening baselines to recommend where mobile developmental screening days should be deployed first.
+- **Agent Action**: Queries American Community Survey (ACS) 5-Year tract demographics (`acs_under5_tract_demographics`) alongside HRSA National Survey of Children's Health (`nsch_developmental_screening_survey`) statewide baselines.
+- **Result**: Identifies high-vulnerability tracts with under-5 poverty rates $>45\%$ and vehicle access deficits $>18\%$ (e.g., Sunflower and Leflore County tracts) where screening mobile clinics prevent referral drop-offs before they start.
+
+---
+
+## 3. Required Differentiator: BigQuery Property Graphs & ISO GQL
+
+A single handoff is a SQL join; a 3-to-4-hop referral bounce loop is a graph. We implemented genuine variable-length ISO GQL graph traversals over BigQuery Property Graph:
+
+```sql
+GRAPH a4i_early_intervention.ReferralGraph
+MATCH (clinic:CareNode {node_role: 'Screening_Pediatric_Clinic'})
+      -[hops:ReferralHandoff]->{2,4}
+      (vendor:CareNode {node_role: 'EI_Therapy_Vendor'})
+WHERE ARRAY_LENGTH(hops) >= 3
+  AND (SELECT COUNT(DISTINCT h.case_chain_id) FROM UNNEST(hops) AS h) = 1
+LET total_hops = ARRAY_LENGTH(hops),
+    chain_id = hops[OFFSET(0)].case_chain_id,
+    chain_wait_days = (SELECT SUM(h.handoff_wait_days) FROM UNNEST(hops) AS h),
+    fax_hops = (SELECT COUNTIF(h.transmission_channel = 'paper_fax') FROM UNNEST(hops) AS h),
+    hop_sources = ARRAY(SELECT h.source_provider_id FROM UNNEST(hops) AS h),
+    hop_targets = ARRAY(SELECT h.target_provider_id FROM UNNEST(hops) AS h),
+    hop_channels = ARRAY(SELECT h.transmission_channel FROM UNNEST(hops) AS h),
+    hop_waits = ARRAY(SELECT h.handoff_wait_days FROM UNNEST(hops) AS h)
+FILTER chain_wait_days >= 45
+RETURN
+  chain_id,
+  clinic.synthetic_organization_name AS origin_clinic,
+  vendor.synthetic_organization_name AS final_vendor,
+  total_hops,
+  fax_hops,
+  chain_wait_days,
+  hop_sources,
+  hop_targets,
+  hop_channels,
+  hop_waits
+ORDER BY chain_wait_days DESC;
+```
+
+---
+
+## 4. Output Artifact: The 45-Day Pathway & Bottleneck Brief
+
+Our solution delivers all 4 core components required in-hand:
+
+### 1. Traced Multi-Hop Referral Path (Shown Visually, Not Just Described)
+Rendered interactively in the web app via **Vis.js directed node-link networks**:
+```
+[Screening Clinic] ──phone(+14d)──> [Bounce Hub: Intake Desk #09] ──paper_fax(+23d)──> [Eval Center #13] ──paper_fax(+21d)──> [Therapy Org #25] ──ehr(+19d)──> [Therapy Org #30]
+```
+- **Nodes**: Color-coded by `CareNode` role (Clinic, Intake Coordinator, Eval Hub, Therapy Vendor).
+- **Edges**: Transmission channel and wait days labeled; **paper fax handoffs rendered as orange dashed arrows** to visually flag transmission friction.
+
+### 2. Recommended $\le 45$-Day Route for Incoming Referral
+- **Path**: Indianola Pediatric Group #05 (4d) $\to$ Indianola Desk #11 (5d) $\to$ Greenwood Eval Hub #19 (7d) $\to$ Greenville Therapy Org #28 (6d).
+- **Metrics**: 22 total days (clearing the 45-day federal clock by 23 days).
+- **Constraints Met**: Accepts Medicaid, verified bilingual Spanish evaluation capacity, and minimum geographic transit (177.8 miles).
+
+### 3. Regional Bounce Hub to Fix First & Child-Days Saved
+- **Primary Bottlenecks**: Indianola Intake Desk (`SYN-PROV-MS-011`) and Jackson Intake Desk (`SYN-PROV-MS-012`).
+- **Counterfactual Intervention**: Upgrading paper faxing to electronic health record (EHR) portal transmissions eliminates **all 26 statutory breaches** and saves **1,168 child-days** statewide.
+
+### 4. Plain-Language Bilingual Caregiver Action Notes
+Generated in both English and Spanish, informing parents of their federal IDEA Part C rights, contact information, expected timelines, and free evaluation services regardless of income.
+
+---
+
+## 5. Planted Data Traps & Technical Pitfalls Hardening
+
+The solution is hardened against all 12 planted traps:
+
+| # | Planted Trap Category | Organizer Trap Description | Hardened Solution in Code |
+|---|---|---|---|
+| **1** | **All-Zero Column Trap** | `limited_english_rate = 0.0` across ACS extract. | Uses `bilingual_services_listed` on `CareNode` and NSCH language baselines. |
+| **2** | **6x Grain Fan-Out Trap** | `nsch_developmental_screening_survey` has 6 statewide strata. Joining on `state_code` duplicates tracts 6x. | Maintained strictly statewide; never joined at tract level. |
+| **3** | **Leading-Zero FIPS Truncation** | Casting GEOID drops leading zeros (`'01001'` $\to$ `1001`). | Enforced strict `.zfill(11)` string formatting on all tract IDs. |
+| **4** | **Case-Chain Cross-Stitching** | Multi-hop GQL stitches Child A's intake to Child B's handoff. | Enforced correlation: `(SELECT COUNT(DISTINCT h.case_chain_id) FROM UNNEST(hops) AS h) = 1`. |
+| **5** | **No `HAVING` in ISO GQL** | `HAVING` clause is unsupported in ISO GQL. | Calculated via `LET` scalar projections and filtered using `FILTER`. |
+| **6** | **Identifier Quoting Trap** | Backticks fail in `CREATE PROPERTY GRAPH`. | Unquoted identifiers: `a4i_early_intervention.ReferralGraph`. |
+| **7** | **Geography in Property Graph** | BigQuery Property Graph rejects `GEOGRAPHY` columns. | Excluded via `EXCEPT (provider_geom)`. Spatial distance computed via `ST_DISTANCE`. |
+| **8** | **Flat Waitlist Illusion** | Low median wait conceals downstream bottlenecks. | Multi-hop cumulative wait calculation exposes 5-day hubs causing 70+ day breaches. |
+| **9** | **Race-in-Routing Trap** | Using demographic shares in routing triggers bias penalties. | Routing uses only timing, Medicaid, language, and geography. Demographics evaluated strictly post-hoc in Equity Audit. |
+| **10** | **36-Month Age-Out Cliff** | Children age out of Part C at 36 months; a 31-month-old delayed by 70 days is disqualified. | Automated high-priority escalation warning triggers for any child $\ge 30$ months. |
+| **11** | **Clinician Defamation Trap** | Attributing delays to real clinics risks defamation. | Explicit disclaimers state all providers (`SYN-PROV-*`) and agencies are **100% `[Synthetic]`**. |
+| **12** | **Licensing / OpenStreetMap Trap** | Scraping commercial directories violates licensing. | Built strictly on public domain US Census ACS 5-Year and HRSA NSCH federal datasets. |
+
+---
+
+## 6. Solution Architecture
 
 ```mermaid
 graph TD
@@ -70,92 +186,11 @@ graph TD
 
 ---
 
-## 3. Required Differentiator: BigQuery Property Graph & ISO GQL
+## 7. Verification & Deployment
 
-The property graph `a4i_early_intervention.ReferralGraph` was created using:
-- **Vertex Table**: `pediatric_and_ei_provider_directory` as `CareNode` (with `PROPERTIES ALL COLUMNS EXCEPT (provider_geom)`).
-- **Edge Table**: `deidentified_part_c_referral_logs` as `ReferralHandoff` connecting `CareNode` source to `CareNode` target.
-
-### Variable-Length Path Traversal (`-{2,4}->`):
-```sql
-GRAPH a4i_early_intervention.ReferralGraph
-MATCH (clinic:CareNode {node_role: 'Screening_Pediatric_Clinic'})
-      -[hops:ReferralHandoff]->{2,4}
-      (vendor:CareNode {node_role: 'EI_Therapy_Vendor'})
-WHERE ARRAY_LENGTH(hops) >= 3
-  AND (SELECT COUNT(DISTINCT h.case_chain_id) FROM UNNEST(hops) AS h) = 1
-LET total_hops = ARRAY_LENGTH(hops),
-    chain_id = hops[OFFSET(0)].case_chain_id,
-    chain_wait_days = (SELECT SUM(h.handoff_wait_days) FROM UNNEST(hops) AS h),
-    fax_hops = (SELECT COUNTIF(h.transmission_channel = 'paper_fax') FROM UNNEST(hops) AS h)
-FILTER chain_wait_days >= 45
-RETURN
-  chain_id,
-  clinic.synthetic_organization_name AS origin_clinic,
-  vendor.synthetic_organization_name AS final_vendor,
-  total_hops,
-  fax_hops,
-  chain_wait_days
-ORDER BY chain_wait_days DESC;
-```
-
----
-
-## 4. Hardening Against All Planted Data Traps & Pitfalls
-
-| # | Planted Trap Category | Organizer Trap Description | Hardened Solution |
-|---|---|---|---|
-| **1** | **All-Zero Column Trap** | `limited_english_rate` in ACS is hardcoded to `0.0`. Composite formulas collapse by 40%. | Language needs are resolved using `bilingual_services_listed` on `CareNode` and `primary_home_language` in NSCH. |
-| **2** | **6x Grain Fan-Out Trap** | `nsch_developmental_screening_survey` has 6 statewide strata. Joining on `state_code` duplicates tracts 6x. | Kept strictly statewide; never joined at tract level to avoid ecological fallacy. |
-| **3** | **Leading-Zero FIPS Truncation** | Casting GEOIDs drops leading zeros (`'01001'` $\to$ `1001`). | Enforced strict `.zfill(11)` string formatting on all tract IDs. |
-| **4** | **Case-Chain Cross-Stitching** | Multi-hop GQL stitches Child A's intake to Child B's handoff through common coordinators. | Enforced correlation: `(SELECT COUNT(DISTINCT h.case_chain_id) FROM UNNEST(hops) AS h) = 1`. |
-| **5** | **No `HAVING` in ISO GQL** | Standard SQL `HAVING` fails in ISO GQL. | Path aggregation is computed with `LET` and piped into `FILTER`. |
-| **6** | **Identifier Quoting Trap** | Backticking `` `project.dataset.table` `` fails in GQL DDL. | Correct unquoted identifiers: `dataset.table`. |
-| **7** | **Geography in Property Graph** | BigQuery Property Graph rejects `GEOGRAPHY` properties. | Excluded via `EXCEPT (provider_geom)`. Spatial distances calculated via `ST_DISTANCE`. |
-| **8** | **Flat Waitlist Illusion** | Low median waitlist conceals downstream breaches. | Multi-hop cumulative wait exposes 5-day hubs causing 70+ day breaches. |
-| **9** | **Race-in-Routing Trap** | Using `audit_*` demographic shares in routing decisions triggers algorithmic bias penalties. | Clinical routing relies strictly on timing, Medicaid, bilingual capacity, and travel distance (`ST_DISTANCE`). `audit_*` shares are evaluated strictly post-output in the Equity Audit. |
-| **10** | **36-Month Age-Out Cliff** | Children age out of Part C at 36 months. A 31-month-old delayed by 70 days is permanently disqualified. | Automated high-priority escalation warning triggers for any child $\ge 30$ months. |
-| **11** | **Clinician Defamation Trap** | Attributing delays to real clinics risks defamation. | Explicit disclaimers state all providers (`SYN-PROV-*`) and agencies are **100% `[Synthetic]`**. |
-| **12** | **Licensing / OpenStreetMap Trap** | Scraping commercial directories or using ODbL data violates open-source rules. | Built strictly on public domain US Census ACS 5-Year and HRSA NSCH federal datasets. |
-
----
-
-## 5. Live Verification & Key Findings
-
-### Finding 1: 45-Day Compliant Route Discovery
-For an active referral of a 31-month-old Spanish-speaking Medicaid toddler in Leflore County tract `28083950200`:
-- **Age-Out Alert Dispatched**: Priority escalation for age 36m cliff (5 months remaining).
-- **Compliant Route**: Indianola Clinic #05 (4d) $\to$ Indianola Desk #11 (5d) $\to$ Greenwood Eval Hub #19 (7d) $\to$ Greenville Therapy Org #28 (6d).
-- **Total Expected Timeline**: **22 Days** (safely clearing the 45-day federal clock).
-- **Spatial Travel**: Total roundtrip travel of **177.8 miles**.
-
-### Finding 2: Counterfactual Policy Intervention
-Upgrading paper faxing to electronic EHR intake across regional intake desks:
-- Eliminates **all 26 statutory 45-day breaches** (from 26 down to 0).
-- Saves **1,168 child-days** across Mississippi.
-
----
-
-## 6. How to Run Locally
-
-```bash
-# 1. Clone repository
-git clone https://github.com/Bornism/A4I2026-challenge-early-intervention.git
-cd A4I2026-challenge-early-intervention
-
-# 2. Setup Python environment
-python3 -m venv venv
-source venv/bin/activate
-pip install -r <(echo "google-adk google-genai google-cloud-bigquery pandas fastapi uvicorn db-dtypes pyarrow")
-
-# 3. Configure Google Cloud credentials
-export GOOGLE_CLOUD_PROJECT="qwiklabs-gcp-03-4b836a7f2e04"
-export GOOGLE_CLOUD_REGION="us-central1"
-export GOOGLE_GENAI_USE_VERTEXAI="true"
-export A4I_DATASET="a4i_early_intervention"
-export A4I_LOCATION="US"
-
-# 4. Start the Coordinator Dashboard
-python -m uvicorn agent.main:app --host 0.0.0.0 --port 8080
-```
-Open `http://localhost:8080` in your browser.
+- **Live URL**: [https://early-intervention-triage-584075988667.us-central1.run.app](https://early-intervention-triage-584075988667.us-central1.run.app)
+- **GitHub Repository**: [https://github.com/Sree-Hari-Priya/agents_for_impact](https://github.com/Sree-Hari-Priya/agents_for_impact)
+- **Local Run**:
+  ```bash
+  python -m uvicorn agent.main:app --host 0.0.0.0 --port 8080
+  ```

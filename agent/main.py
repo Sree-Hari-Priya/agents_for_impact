@@ -127,12 +127,34 @@ def index():
     <div class="container">
       <div class="d-flex align-items-center justify-content-between">
         <div>
+          <span class="badge bg-light text-dark mb-2">Challenge 04 · Early Intervention & Developmental Screening Triage</span>
           <h1 class="h2 mb-1 font-weight-bold">First Milestones: IDEA Part C Triage & Network-Audit</h1>
-          <p class="mb-0 opacity-75">BigQuery Property Graph (ISO GQL) · Google ADK Agent · Vertex AI Gemini</p>
+          <p class="mb-0 opacity-75">BigQuery Property Graph (ISO GQL) · Google ADK Agent · Vertex AI Gemini 2.5 Flash</p>
         </div>
         <div class="text-end">
           <span class="badge bg-warning text-dark px-3 py-2">State: Mississippi (MS)</span>
           <div class="small mt-1 text-light">100% [Synthetic] Provider Topology</div>
+        </div>
+      </div>
+      <!-- Track Badges -->
+      <div class="row g-2 mt-3 pt-2 border-top border-light border-opacity-25">
+        <div class="col-md-4">
+          <div class="small bg-white bg-opacity-10 p-2 rounded">
+            <strong>Track 1: Today's Referral</strong><br>
+            <span class="opacity-75">Route toddler to <=45d compliant path with 36m age cliff guard.</span>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="small bg-white bg-opacity-10 p-2 rounded">
+            <strong>Track 2: This Quarter's Audit</strong><br>
+            <span class="opacity-75">Variable-length GQL reveals paper-fax bounce hubs breaking federal clock.</span>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="small bg-white bg-opacity-10 p-2 rounded">
+            <strong>Track 3: This Outreach Season</strong><br>
+            <span class="opacity-75">Combine under-5 poverty & screening gaps for mobile clinic priority.</span>
+          </div>
         </div>
       </div>
     </div>
