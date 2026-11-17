@@ -1480,8 +1480,6 @@ I can help you resolve today's intake bottlenecks immediately:
         document.getElementById('simSummaryText').innerHTML = `<span class="text-danger">Simulation failed: ${err.message}</span>`;
       }
     }
-      }
-    }
   </script>
 </body>
 </html>
