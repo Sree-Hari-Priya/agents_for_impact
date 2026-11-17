@@ -313,7 +313,7 @@ def find_compliant_toddler_pathway(
 
     sql = f"""
     WITH target_tract AS (
-      SELECT census_tract_geoid, county_name, latitude, longitude, tract_geom
+      SELECT census_tract_geoid, county_name, poverty_rate, no_vehicle_rate, latitude, longitude, tract_geom
       FROM `{DATASET_ID}.acs_under5_tract_demographics`
       WHERE census_tract_geoid = '{clean_geoid}'
       LIMIT 1
@@ -343,6 +343,9 @@ def find_compliant_toddler_pathway(
       WHERE node_role = 'EI_Therapy_Vendor'
     )
     SELECT
+      t.county_name AS tract_county_name,
+      ROUND(t.poverty_rate * 100, 1) AS tract_poverty_pct,
+      ROUND(t.no_vehicle_rate * 100, 1) AS tract_no_vehicle_pct,
       c.provider_id AS clinic_id,
       c.synthetic_organization_name AS screening_clinic,
       c.median_internal_wait_days AS clinic_wait,
@@ -391,8 +394,12 @@ def find_compliant_toddler_pathway(
         tract_rows = acs_df[acs_df["census_tract_geoid"] == clean_geoid]
         if tract_rows.empty:
             tract_rows = acs_df.head(1)
-        t_lat = float(tract_rows.iloc[0]["latitude"])
-        t_lon = float(tract_rows.iloc[0]["longitude"])
+        t_row = tract_rows.iloc[0]
+        t_lat = float(t_row["latitude"])
+        t_lon = float(t_row["longitude"])
+        t_county = str(t_row.get("county_name", "Delta Region"))
+        t_pov_pct = round(float(t_row.get("poverty_rate", 0.0)) * 100.0, 1)
+        t_no_veh_pct = round(float(t_row.get("no_vehicle_rate", 0.0)) * 100.0, 1)
 
         clinics = prov_df[prov_df["node_role"] == "Screening_Pediatric_Clinic"]
         coords = prov_df[prov_df["node_role"] == "Part_C_Intake_Coordinator"]
@@ -426,6 +433,9 @@ def find_compliant_toddler_pathway(
                             d_v = _haversine_miles(t_lat, t_lon, v["latitude"], v["longitude"])
                             routes.append(
                                 {
+                                    "tract_county_name": t_county,
+                                    "tract_poverty_pct": t_pov_pct,
+                                    "tract_no_vehicle_pct": t_no_veh_pct,
                                     "clinic_id": str(c["provider_id"]),
                                     "screening_clinic": str(c["synthetic_organization_name"]),
                                     "clinic_wait": int(c["median_internal_wait_days"]),
@@ -477,10 +487,33 @@ def find_compliant_toddler_pathway(
             f"With only {36 - child_age_months} months remaining, immediate expedited intake and IFSP scheduling is required."
         )
 
+    zero_vehicle_guardrail = None
+    if routes:
+        top_r = routes[0]
+        no_veh_pct = float(top_r.get("tract_no_vehicle_pct", 0.0) or 0.0)
+        eval_mi = float(top_r.get("eval_hub_distance_miles", 0.0) or 0.0)
+        tot_mi = float(top_r.get("total_travel_miles", 0.0) or 0.0)
+        if no_veh_pct >= 8.0 or eval_mi >= 12.0 or tot_mi >= 20.0:
+            zero_vehicle_guardrail = {
+                "triggered": True,
+                "tract_no_vehicle_pct": no_veh_pct,
+                "eval_hub_distance_miles": eval_mi,
+                "total_travel_miles": tot_mi,
+                "recommended_modality": "Tele-Assessment or Mobile Developmental Evaluation Unit",
+                "alert": (
+                    f"ZERO-VEHICLE TRAVEL GUARDRAIL: Tract {clean_geoid} ({top_r.get('tract_county_name', '')}) "
+                    f"has {no_veh_pct}% zero-vehicle households and sits {eval_mi} miles from the nearest "
+                    f"<=45-day bilingual evaluation hub ({tot_mi} total pathway miles). "
+                    f"Recommend deploying a Mobile Developmental Evaluation Unit or scheduling an IDEA Part C "
+                    f"bilingual Tele-Assessment / Non-Emergency Medical Transport (NEMT) voucher."
+                ),
+            }
+
     return {
         "status": "success",
         "child_age_months": child_age_months,
         "age_warning": age_warning,
+        "zero_vehicle_travel_guardrail": zero_vehicle_guardrail,
         "census_tract_geoid": clean_geoid,
         "criteria": {
             "requires_medicaid": requires_medicaid,

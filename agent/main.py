@@ -699,7 +699,10 @@ def index():
         const p = data.recommended_pathways[0];
         let alertHtml = '';
         if (data.age_warning) {
-          alertHtml = `<div class="alert alert-danger p-2 mb-2">${data.age_warning}</div>`;
+          alertHtml += `<div class="alert alert-danger p-2 mb-2">${data.age_warning}</div>`;
+        }
+        if (data.zero_vehicle_travel_guardrail && data.zero_vehicle_travel_guardrail.alert) {
+          alertHtml += `<div class="alert alert-warning p-2 mb-2">🚐 <strong>${data.zero_vehicle_travel_guardrail.alert}</strong></div>`;
         }
         resultDiv.innerHTML = `
           ${alertHtml}
