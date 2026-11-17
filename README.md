@@ -182,7 +182,22 @@ Keep two state nuances in mind:
 
 Write down your state, your track, and your scenario before writing code:
 
-> *"We coordinate IDEA Part C Early Intervention in ______. When ______ arrives, flat waitlists hide ______ across multi-hop referrals. Here is the <=45-day route our graph finds, and here is the regional bounce hub we fix first."*
+> **"We coordinate IDEA Part C Early Intervention in NY. When Manuel 22 month old bilingual arrives, flat waitlists hide paper faxes and incomplete paperwork issues across multi-hop referrals. Here is the <=45-day route our graph finds, and here is the regional bounce hub we fix first."**
+
+### Team Project & Submission Metadata
+
+| Field | Value |
+|---|---|
+| **State Selected** | **New York (`NY`, FIPS `36`)** |
+| **Primary Track** | **Track 1: Today's Toddler Referral** (*Manuel, 22-month-old Spanish-bilingual child under federal 45-day IFSP clock*) |
+| **Combined Track** | **Track 2: Systemic Network & Equity Audit** (*Diagnosing paper-fax bounce hubs & counterfactual EHR fixes*) |
+| **Live Deployed Service** | [https://early-intervention-triage-584075988667.us-central1.run.app/](https://early-intervention-triage-584075988667.us-central1.run.app/) |
+| **GCP Project** | `qwiklabs-gcp-03-4b836a7f2e04` (Region: `us-central1`) |
+| **BigQuery Dataset & Graph** | `qwiklabs-gcp-03-4b836a7f2e04.a4i_early_intervention.ReferralGraph` |
+| **Agent Framework** | **Google ADK (Agent Development Kit)** + **Vertex AI Gemini 2.5 Flash** |
+| **Multi-Agent Pipeline** | `milestone_navigator_agent` (Root) → `brief_generator_pipeline` (`pathway_router_agent` → `network_audit_agent` → `equity_audit_agent` → `caregiver_note_agent`) |
+| **Graph Query Engine** | **ISO/IEC 39075 GQL** over `CREATE PROPERTY GRAPH` with correlated `case_chain_id` and variable-length `-{2,4}->` hops |
+| **Provenance Note** | All provider directories and referral logs are **100% `[Synthetic]`** to protect clinician privacy; tract demographics are **Real US Census ACS 5-Year** |
 
 ---
 
@@ -256,8 +271,8 @@ Three routes. **Pick deliberately and be ready to say why**, because your interf
 
 Upload **four required artifacts** to https://portal.angelhack.com/a4i-console before deadline:
 
-1. **Public GitHub repository link**
-2. **Google Skills project link** (with live deployed agent)
+1. **Public GitHub repository link**: `https://github.com/Sree-Hari-Priya/agents_for_impact`
+2. **Google Skills project link / Live Deployed Agent**: [https://early-intervention-triage-584075988667.us-central1.run.app/](https://early-intervention-triage-584075988667.us-central1.run.app/)
 3. **Pitch deck** (problem, chosen state & track, visual multi-hop graph findings, explicit statement that providers/logs are 100% synthetic, `audit_*` Equity Audit numbers, and limitations)
 4. **Pitch video (maximum 3 minutes)**: narrated screen-share walkthrough of a live run of your deployed agent
 
