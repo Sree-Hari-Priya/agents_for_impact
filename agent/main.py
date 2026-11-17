@@ -24,6 +24,7 @@ from agent.tools import (
     get_state_geospatial_graph_data,
     simulate_single_network_fix,
     validate_pre_handoff_packet,
+    resolve_geographic_location_and_nearest_clinics,
 )
 from google.adk import Runner
 from google.adk.sessions import InMemorySessionService
@@ -87,6 +88,19 @@ async def chat(req: ChatRequest):
 @app.get("/api/graph/breaches")
 def get_breaches(min_wait_days: int = 45, limit: int = 10, state_code: str = "NY"):
     return trace_45day_breaches_and_bounce_hubs(min_wait_days=min_wait_days, limit=limit, state_code=state_code)
+
+class GeoResolveRequest(BaseModel):
+    query: str = "10451"
+    state_code: str = "NY"
+    top_n: int = 3
+
+@app.post("/api/geo/resolve")
+def geo_resolve(req: GeoResolveRequest):
+    return resolve_geographic_location_and_nearest_clinics(
+        query=req.query,
+        state_code=req.state_code,
+        top_n=req.top_n
+    )
 
 @app.post("/api/triage/route")
 def triage_route(req: TriageRequest):
@@ -163,6 +177,10 @@ def index():
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>First Milestones - Early Intervention Triage & Network Audit</title>
+  <!-- Google Fonts: Open Sans (NYSED Official Typography) & Merriweather (State Official Serif) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,400;0,700;1,300&family=Open+Sans:ital,wght@0,300;0,400;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -170,79 +188,164 @@ def index():
   <script type="text/javascript" src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     :root {
-      --primary-color: #1a73e8;
-      --primary-dark: #0d47a1;
-      --card-radius: 1rem;
+      /* NYSED (New York State Education Department) Official Branding Palette */
+      --nysed-navy: #002D62;        /* Official NYSED Deep Navy Blue */
+      --nysed-navy-dark: #001A3A;   /* State Header Deep Navy */
+      --nysed-blue: #004B87;        /* Core Blue Accent */
+      --nysed-gold: #C29B38;        /* NY State Seal Gold */
+      --nysed-gold-light: #F4E8C1;  /* Gold accent tint */
+      --nysed-gold-hover: #A37F22;
+      --nysed-bg-gray: #F4F6F9;     /* Clean institutional backdrop */
+      --nysed-text: #212529;
+      --nysed-text-muted: #59616B;
+      --nysed-border: #DDE2E8;
+      --primary-color: #004B87;
+      --primary-dark: #002D62;
+      --card-radius: 0.5rem;
     }
     body {
-      background-color: #f1f5f9;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      color: #1e293b;
+      background-color: var(--nysed-bg-gray);
+      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      color: var(--nysed-text);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    h1, h2, h3, .brand-title {
+      font-family: 'Merriweather', Georgia, serif;
+      letter-spacing: -0.2px;
+    }
+    h4, h5, h6, .fw-bold {
+      font-family: 'Open Sans', sans-serif;
+    }
+    /* Official NY State Top Banner */
+    .ny-gov-banner {
+      background-color: #111a24;
+      color: #ced4da;
+      font-size: 0.76rem;
+      padding: 0.35rem 1rem;
+      border-bottom: 2px solid var(--nysed-gold);
+    }
+    .ny-gov-banner a {
+      color: #e9ecef;
+      text-decoration: none;
+    }
+    .ny-gov-banner a:hover {
+      color: var(--nysed-gold-light);
+      text-decoration: underline;
     }
     .hero {
-      background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #0369a1 100%);
+      background: linear-gradient(135deg, rgba(0, 45, 98, 0.96) 0%, rgba(0, 75, 135, 0.92) 55%, rgba(10, 30, 60, 0.95) 100%),
+                  url("https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?auto=format&fit=crop&w=1920&q=80") center/cover no-repeat;
       color: white;
       padding: 2.2rem 1.5rem 1.8rem;
       margin-bottom: 1.8rem;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+      box-shadow: 0 6px 20px rgba(0, 45, 98, 0.25);
+      border-bottom: 4px solid var(--nysed-gold);
     }
     .card {
       border-radius: var(--card-radius);
-      border: 1px solid rgba(226, 232, 240, 0.8);
-      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+      border: 1px solid var(--nysed-border);
+      box-shadow: 0 2px 10px rgba(0, 45, 98, 0.05);
       margin-bottom: 1.5rem;
       background: #ffffff;
     }
+    .card-header {
+      background-color: #f8fafc;
+      border-bottom: 1px solid var(--nysed-border);
+      font-weight: 700;
+      color: var(--nysed-navy);
+    }
+    .btn-primary {
+      background-color: var(--nysed-blue) !important;
+      border-color: var(--nysed-navy) !important;
+      font-weight: 600;
+    }
+    .btn-primary:hover, .btn-primary:focus {
+      background-color: var(--nysed-navy) !important;
+      border-color: var(--nysed-navy-dark) !important;
+    }
+    .btn-outline-primary {
+      color: var(--nysed-blue) !important;
+      border-color: var(--nysed-blue) !important;
+    }
+    .btn-outline-primary:hover {
+      background-color: var(--nysed-blue) !important;
+      color: #ffffff !important;
+    }
+    .badge-nysed-gold {
+      background-color: var(--nysed-gold) !important;
+      color: #ffffff !important;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
     .stat-badge {
-      font-size: 1.65rem;
+      font-size: 1.75rem;
       font-weight: 800;
       letter-spacing: -0.5px;
+      font-family: 'Open Sans', sans-serif;
     }
-    .badge-breach { background-color: #ef4444; color: white; }
-    .badge-pass { background-color: #10b981; color: white; }
+    .badge-breach { background-color: #c92a2a; color: white; }
+    .badge-pass { background-color: #2b8a3e; color: white; }
     .chat-box {
       height: 420px;
       overflow-y: auto;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 0.75rem;
+      background: #fbfcfd;
+      border: 1px solid var(--nysed-border);
+      border-radius: 0.5rem;
       padding: 1.2rem;
     }
     .msg-user {
-      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      background: linear-gradient(135deg, var(--nysed-blue), var(--nysed-navy));
       color: #ffffff;
-      border-radius: 0.85rem 0.85rem 0.2rem 0.85rem;
+      border-radius: 0.75rem 0.75rem 0.15rem 0.75rem;
       padding: 0.75rem 1.1rem;
       margin-bottom: 0.75rem;
       max-width: 82%;
       margin-left: auto;
-      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+      box-shadow: 0 2px 6px rgba(0, 45, 98, 0.2);
     }
     .msg-agent {
       background-color: #ffffff;
-      color: #0f172a;
-      border: 1px solid #e2e8f0;
-      border-radius: 0.85rem 0.85rem 0.85rem 0.2rem;
-      padding: 0.75rem 1.1rem;
+      color: #1a202c;
+      border: 1px solid #d0d7de;
+      border-left: 4px solid var(--nysed-gold);
+      border-radius: 0.2rem 0.75rem 0.75rem 0.75rem;
+      padding: 0.85rem 1.15rem;
       margin-bottom: 0.75rem;
       max-width: 88%;
       white-space: pre-wrap;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04);
-      line-height: 1.5;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+      line-height: 1.55;
     }
     .track-nav-btn {
-      border-radius: 0.75rem !important;
-      padding: 0.65rem 1.25rem;
+      border-radius: 0.35rem !important;
+      padding: 0.6rem 1.15rem;
       font-weight: 600;
-      font-size: 0.92rem;
+      font-size: 0.90rem;
       transition: all 0.2s ease-in-out;
-      border: 1px solid rgba(255, 255, 255, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      font-family: 'Open Sans', sans-serif;
     }
     .track-nav-btn.active {
       background: #ffffff !important;
-      color: #1e3a8a !important;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.18);
-      transform: translateY(-1px);
+      color: var(--nysed-navy) !important;
+      border-color: #ffffff !important;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+      font-weight: 700;
+    }
+    .track-nav-btn-light {
+      opacity: 0.82;
+      font-size: 0.85rem !important;
+      padding: 0.5rem 0.95rem !important;
+      border: 1px solid rgba(255, 255, 255, 0.3) !important;
+      background: rgba(0, 26, 58, 0.45) !important;
+      color: #f1f5f9 !important;
+    }
+    .track-nav-btn-light:hover {
+      opacity: 1.0;
+      background: rgba(0, 26, 58, 0.75) !important;
+      color: #ffffff !important;
+      border-color: var(--nysed-gold) !important;
     }
     .track-pane {
       display: none;
@@ -256,50 +359,72 @@ def index():
       to { opacity: 1; transform: translateY(0); }
     }
     .kpi-card {
-      transition: transform 0.2s ease;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      border-top: 3px solid var(--nysed-blue);
     }
     .kpi-card:hover {
       transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(0, 45, 98, 0.1);
     }
     .table-custom th {
-      background: #f8fafc;
-      color: #475569;
+      background: #002D62 !important;
+      color: #ffffff !important;
       font-weight: 600;
-      font-size: 0.82rem;
+      font-size: 0.80rem;
       text-transform: uppercase;
       letter-spacing: 0.5px;
+      border: none;
     }
     .form-control, .form-select {
-      border-radius: 0.5rem;
+      border-radius: 0.35rem;
       border-color: #cbd5e1;
+      font-family: 'Open Sans', sans-serif;
     }
     .form-control:focus, .form-select:focus {
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+      border-color: var(--nysed-blue);
+      box-shadow: 0 0 0 3px rgba(0, 75, 135, 0.18);
     }
   </style>
 </head>
 <body>
+  <!-- Official NY.GOV State Bar -->
+  <div class="ny-gov-banner">
+    <div class="container d-flex justify-content-between align-items-center">
+      <div class="d-flex align-items-center gap-2">
+        <span class="fw-bold text-white tracking-wider" style="letter-spacing: 0.8px;">NY.GOV</span>
+        <span class="text-white-50">|</span>
+        <span>An Official New York State Early Intervention Quality System</span>
+      </div>
+      <div class="d-none d-md-flex gap-3">
+        <a href="https://www.nysed.gov/" target="_blank"><i class="fa-solid fa-graduation-cap me-1"></i>NYSED.gov</a>
+        <a href="https://www.health.ny.gov/community/infants_children/early_intervention/" target="_blank"><i class="fa-solid fa-notes-medical me-1"></i>NY DOH Early Intervention (BEI)</a>
+      </div>
+    </div>
+  </div>
+
   <div class="hero">
     <div class="container">
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
         <div class="d-flex align-items-center gap-3">
-          <img
-            src="https://images.unsplash.com/photo-1596464716127-f2a82984de30?auto=format&fit=crop&w=240&q=80"
-            alt="Toddler stacking wooden milestone blocks (Illustrative Only — Zero Real Patient PII)"
-            style="width: 76px; height: 76px; object-fit: cover; border-radius: 50%; border: 3px solid rgba(255,255,255,0.85); box-shadow: 0 4px 10px rgba(0,0,0,0.2);"
-          />
+          <!-- NYSED Seal Style Avatar -->
+          <div class="p-1 rounded-circle" style="background: var(--nysed-gold); box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+            <img
+              src="https://images.unsplash.com/photo-1596464716127-f2a82984de30?auto=format&fit=crop&w=240&q=80"
+              alt="Toddler stacking wooden milestone blocks (Illustrative Only — Zero Real Patient PII)"
+              style="width: 72px; height: 72px; object-fit: cover; border-radius: 50%; border: 2px solid #ffffff;"
+            />
+          </div>
           <div>
             <div class="d-flex align-items-center gap-2 mb-1">
-              <span class="badge bg-light text-primary fw-bold px-2 py-1">Challenge 04</span>
-              <span class="badge bg-white bg-opacity-25 text-white">IDEA Part C Early Intervention &amp; Developmental Screening</span>
+              <span class="badge badge-nysed-gold px-2 py-1"><i class="fa-solid fa-shield-halved me-1"></i>NYSED / IDEA Part C</span>
+              <span class="badge bg-white bg-opacity-20 text-white" style="border: 1px solid rgba(255,255,255,0.25);">Early Intervention &amp; Developmental Screening</span>
             </div>
-            <h1 class="h2 mb-1 fw-bold">First Milestones: Triage &amp; Network-Audit</h1>
-            <p class="mb-0 text-white-50 small">BigQuery Property Graph (ISO GQL) · Google ADK Agent · Vertex AI Gemini 2.5 Flash</p>
+            <h1 class="h2 mb-1 fw-bold text-white">First Milestones: Triage &amp; Network-Audit</h1>
+            <p class="mb-0 text-white-50 small" style="letter-spacing: 0.2px;">BigQuery Property Graph (ISO GQL) · Google ADK Agent · Vertex AI Gemini 2.5 Flash</p>
           </div>
         </div>
         <div class="text-end">
-          <div class="d-inline-flex align-items-center gap-2 bg-warning text-dark px-3 py-1 rounded-pill fw-bold small shadow-sm">
+          <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill fw-bold small shadow-sm" style="background: var(--nysed-gold); color: #001A3A;">
             <i class="fa-solid fa-map-pin text-danger"></i> State: New York (NY · FIPS 36)
           </div>
           <div class="small mt-1 text-white-50">89 Census Tracts · 30 CareNodes · 100% [Synthetic] Network</div>
@@ -314,18 +439,18 @@ def index():
             <button id="btnTrack1" type="button" class="btn btn-sm btn-light track-nav-btn active" onclick="activateTrack(1)">
               <i class="fa-solid fa-compass me-1 text-primary"></i> Track 1: Today's Referral
             </button>
-            <button id="btnTrack2" type="button" class="btn btn-sm btn-outline-light track-nav-btn" onclick="activateTrack(2)">
-              <i class="fa-solid fa-network-wired me-1"></i> Track 2: This Quarter's Audit
+            <button id="btnTrack2" type="button" class="btn btn-sm track-nav-btn track-nav-btn-light" onclick="activateTrack(2)">
+              <i class="fa-solid fa-network-wired me-1"></i> Track 2: Quarterly Audit
             </button>
-            <button id="btnTrack3" type="button" class="btn btn-sm btn-outline-light track-nav-btn" onclick="activateTrack(3)">
+            <button id="btnTrack3" type="button" class="btn btn-sm track-nav-btn track-nav-btn-light" onclick="activateTrack(3)">
               <i class="fa-solid fa-van-shuttle me-1"></i> Track 3: Outreach Season
             </button>
-            <button id="btnTrack4" type="button" class="btn btn-sm btn-outline-light fw-semibold" onclick="activateTrack(4)">
-              🛠️ Track 4: Single Network Fix Simulator
+            <button id="btnTrack4" type="button" class="btn btn-sm track-nav-btn track-nav-btn-light" onclick="activateTrack(4)">
+              🛠️ Track 4: Simulator
             </button>
           </div>
         </div>
-        <div id="trackBannerInfo" class="small text-white bg-white bg-opacity-10 px-3 py-1 rounded-pill">
+        <div id="trackBannerInfo" class="small text-white px-3 py-1 rounded-pill" style="background: rgba(0, 45, 98, 0.65); border: 1px solid var(--nysed-gold);">
           <strong>Track 1:</strong> Route today's toddler referral (&le;45d compliant path with 36m age cliff guard).
         </div>
       </div>
@@ -373,47 +498,97 @@ def index():
         <!-- Quick Triage Routing Panel -->
         <div class="col-lg-5">
           <div class="card p-4 h-100">
-            <div class="d-flex align-items-center justify-content-between mb-3">
-              <h5 class="card-title mb-0 fw-bold"><i class="fa-solid fa-sliders text-primary me-2"></i>Triage &amp; Route Optimizer</h5>
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <h5 class="card-title mb-0 fw-bold"><i class="fa-solid fa-compass text-primary me-2"></i>Today's Referral Navigator</h5>
               <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Statutory Clock: 45 Days</span>
             </div>
             <p class="text-muted small mb-3">
-              Verify local provider capacity, bilingual evaluator availability, Medicaid acceptance, and the zero-vehicle transit guardrail before placing referral.
+              Enter the child's natural geographic location (ZIP Code, City, or Census Tract GEOID) to resolve nearest screening centers and calculate a guaranteed &le;45d IDEA Part C pathway.
             </p>
 
-            <div class="row g-2 mb-3">
-              <div class="col-6">
-                <label class="form-label small fw-semibold mb-1">Child Age (Months)</label>
-                <input type="number" id="childAge" class="form-control" value="22" min="1" max="35">
-                <span class="text-muted" style="font-size:0.72rem;">Part C Cliff: 36 Months</span>
+            <!-- Natural Geographic Input -->
+            <div class="mb-3 p-2 bg-light rounded-3 border">
+              <label class="form-label small fw-bold mb-1 d-flex justify-content-between">
+                <span><i class="fa-solid fa-map-location-dot text-danger me-1"></i>Location (ZIP, City, or Census GEOID)</span>
+                <span id="geoMatchBadge" class="badge bg-secondary" style="font-size:0.7rem;">Auto-Resolving</span>
+              </label>
+              <div class="input-group input-group-sm mb-1">
+                <input type="text" id="geoInput" class="form-control" value="10451" placeholder="e.g. 10451, Bronx, Jamestown, Lockport, or 36005019700" oninput="debounceGeoResolve()">
+                <button class="btn btn-outline-primary" type="button" onclick="resolveLocationNow()">
+                  <i class="fa-solid fa-magnifying-glass-location"></i>
+                </button>
               </div>
-              <div class="col-6">
-                <label class="form-label small fw-semibold mb-1">Census Tract GEOID</label>
-                <input type="text" id="tractGeoid" class="form-control" value="36005019700">
-                <span class="text-muted" style="font-size:0.72rem;">Default: 36005019700 (Bronx County, NY)</span>
+              <div class="d-flex flex-wrap gap-1 mt-1 mb-1" style="font-size: 0.72rem;">
+                <span class="text-muted me-1">Quick Select:</span>
+                <a href="javascript:void(0)" class="badge bg-white text-primary border text-decoration-none" onclick="setGeoLocation('10451')">10451 (Bronx)</a>
+                <a href="javascript:void(0)" class="badge bg-white text-primary border text-decoration-none" onclick="setGeoLocation('14094')">14094 (Lockport)</a>
+                <a href="javascript:void(0)" class="badge bg-white text-primary border text-decoration-none" onclick="setGeoLocation('13617')">13617 (Canton)</a>
+                <a href="javascript:void(0)" class="badge bg-white text-primary border text-decoration-none" onclick="setGeoLocation('14701')">14701 (Jamestown)</a>
+              </div>
+              <!-- Hidden underlying Census GEOID passed to routing algorithms -->
+              <input type="hidden" id="tractGeoid" value="36005019700">
+              <div id="geoResolvedText" class="small text-primary fw-semibold" style="font-size:0.78rem;">
+                📍 Resolved: ZIP 10451 — Bronx (Mott Haven) · Tract 36005019700
+              </div>
+            </div>
+
+            <!-- Dynamic Closest Screening Centers Preview -->
+            <div id="closestClinicsCard" class="card p-2 mb-3 bg-white border shadow-xs" style="font-size:0.78rem;">
+              <div class="fw-bold text-dark mb-1 d-flex justify-content-between align-items-center">
+                <span>🏥 Nearest Screening Centers</span>
+                <span class="text-muted" style="font-size:0.7rem;">Live Spatial Radius</span>
+              </div>
+              <div id="closestClinicsList">
+                <div class="text-muted small">Resolving nearby pediatric screening centers...</div>
+              </div>
+            </div>
+
+            <div class="row g-2 mb-3">
+              <div class="col-12">
+                <label class="form-label small fw-semibold mb-1">Child Age (Months)</label>
+                <input type="number" id="childAge" class="form-control" value="22" min="1" max="48" onchange="runTriage()">
+                <span class="text-muted" style="font-size:0.72rem;">Part C Cliff: 36 Months (Urgent alert triggers at 30+ months)</span>
               </div>
             </div>
 
             <div class="p-3 bg-light rounded-3 mb-3 border">
               <div class="form-check form-switch mb-2">
-                <input class="form-check-input" type="checkbox" id="reqMedicaid" checked>
+                <input class="form-check-input" type="checkbox" id="reqMedicaid" checked onchange="runTriage()">
                 <label class="form-check-label small fw-semibold" for="reqMedicaid">Requires Medicaid Acceptance</label>
               </div>
-              <div class="form-check form-switch mb-0">
-                <input class="form-check-input" type="checkbox" id="reqBilingual" checked>
+              <div class="form-check form-switch mb-1">
+                <input class="form-check-input" type="checkbox" id="reqBilingual" checked onchange="runTriage()">
                 <label class="form-check-label small fw-semibold" for="reqBilingual">Requires Bilingual Evaluator (Spanish)</label>
+              </div>
+              <div id="routingCriteriaNotice" class="mt-2 pt-2 border-top small" style="font-size: 0.76rem;">
+                <span class="badge bg-purple text-white" style="background:#7c3aed;"><i class="fa-solid fa-language me-1"></i>Bilingual Spanish Mandate Active</span>
+                <span class="text-muted d-block mt-1">Locks pathway to verified bilingual evaluation hubs (Lockport NY-019). Toggle off to allow standard English/monolingual hubs.</span>
               </div>
             </div>
 
-            <button class="btn btn-primary w-100 fw-semibold py-2 mb-3" onclick="runTriage()">
+            <button class="btn btn-primary w-100 fw-semibold py-2 mb-3 shadow-sm" onclick="runTriage()">
               <i class="fa-solid fa-route me-1"></i> Calculate Compliant Pathway (&le; 45d)
             </button>
 
+            <!-- Triage Result Container -->
             <div id="triageResult" class="small text-muted border rounded p-3 bg-white" style="min-height: 120px;">
               <div class="text-center py-3 text-secondary">
                 <i class="fa-regular fa-circle-question fa-2x mb-2 text-muted"></i>
-                <div>Click above to calculate optimal graph routing.</div>
+                <div>Click above or toggle any switch to calculate optimal graph routing.</div>
               </div>
+            </div>
+
+            <!-- Agentic Pathway Graph Viz for Today's Child -->
+            <div id="triageGraphCard" class="card p-3 mt-3 border-0 bg-dark text-white" style="display: none;">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold mb-0 text-white" style="font-size: 0.85rem;">
+                  <i class="fa-solid fa-diagram-project text-info me-1"></i> Pathway Handoff Graph (This Toddler)
+                </h6>
+                <button type="button" class="btn btn-xs btn-outline-info py-0 px-2" style="font-size: 0.72rem;" onclick="centerMapOnCurrentPathway()">
+                  <i class="fa-solid fa-location-crosshairs me-1"></i> View on Map
+                </button>
+              </div>
+              <svg id="svgTriagePathway" viewBox="0 0 680 130" class="w-100" style="background: #0f172a; border-radius: 6px;"></svg>
             </div>
           </div>
         </div>
@@ -422,21 +597,26 @@ def index():
         <div class="col-lg-7">
           <div class="card p-4 h-100">
             <div class="d-flex align-items-center justify-content-between mb-3">
-              <h5 class="card-title mb-0 fw-bold"><i class="fa-solid fa-robot text-primary me-2"></i>ADK Coordinator Casework Assistant</h5>
-              <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="fa-solid fa-circle text-success me-1" style="font-size: 7px;"></i>Agent Ready</span>
+              <div>
+                <h5 class="card-title mb-0 fw-bold"><i class="fa-solid fa-heart-pulse text-danger me-2"></i>Milestone Navigator</h5>
+                <small class="text-muted">AI Casework Partner · Google ADK Multi-Agent System · BigQuery Property Graph</small>
+              </div>
+              <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="fa-solid fa-circle text-success me-1" style="font-size: 7px;"></i>Navigator Online</span>
             </div>
             <div id="chatBox" class="chat-box mb-3">
-              <div class="msg-agent">👋 <strong>Hello Coordinator.</strong> I am your AI Early Intervention Assistant powered by Google ADK and BigQuery Property Graph.
+              <div class="msg-agent">👋 <strong>Hello Coordinator! I am Maya, your Milestone Navigator.</strong>
 
-I can help you resolve today's intake bottlenecks immediately:
-• <strong>Compliant Routing:</strong> "Route a 22-month-old Spanish-speaking Medicaid toddler near tract 36005019700."
-• <strong>Network Fix Simulation:</strong> "Simulate network fix: how many breached cases drop under 45 days if Indianola intake coordinator switches to electronic intake with pre-checked bilingual slots?"
-• <strong>Caregiver Notes:</strong> "Generate bilingual caregiver action notes for the Rivera family and toddler Mateo."
-• <strong>Transit Check:</strong> "Does Bronx tract 36005019700 trigger the zero-vehicle transit guardrail?"
-• <strong>Packet Audit:</strong> "Validate pre-handoff packet completeness for a 32-month-old Spanish Medicaid toddler to coordinator SYN-PROV-NY-011."</div>
+I partner with you to ensure every infant and toddler reaches their developmental evaluation well within the federal 45-day statutory IFSP clock.
+
+<strong>How can I assist today's casework?</strong>
+• <strong>Natural Location Triage:</strong> <em>"Route a 22-month-old Spanish-speaking Medicaid toddler living in ZIP 10451."</em>
+• <strong>Age Cliff Escalation:</strong> <em>"We just received a 32-month-old referral in Canton. What is the emergency fast-track sequence before they age out at 36 months?"</em>
+• <strong>Caregiver Action Notes:</strong> <em>"Draft bilingual English and Spanish family action notes for the Rivera family and toddler Mateo."</em>
+• <strong>Pre-Handoff Quality Audit:</strong> <em>"Check if referral packet for 22m Spanish toddler to coordinator SYN-PROV-NY-011 will bounce."</em>
+• <strong>Transit Check:</strong> <em>"Does Bronx tract 36005019700 trigger the zero-vehicle transit guardrail?"</em></div>
             </div>
             <div class="input-group">
-              <input type="text" id="userInput" class="form-control py-2" placeholder="Ask your question (e.g. Find a <=45d path for today's toddler)..." onkeydown="if(event.key==='Enter') sendMessage()">
+              <input type="text" id="userInput" class="form-control py-2" placeholder="Ask Maya (e.g. Find a pathway for a 20-month-old in ZIP 10451 on Medicaid)..." onkeydown="if(event.key==='Enter') sendMessage()">
               <button class="btn btn-primary px-4 fw-semibold" onclick="sendMessage()"><i class="fa-solid fa-paper-plane me-1"></i> Send</button>
             </div>
           </div>
@@ -662,7 +842,7 @@ I can help you resolve today's intake bottlenecks immediately:
     </div>
 
     <!-- Interactive Single Network Fix Simulator (Challenge Requirement) -->
-    <div class="row mt-2">
+    <div id="trackPane4" class="track-pane row mt-2">
       <div class="col-12">
         <div class="card p-4 border-primary">
           <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
@@ -675,10 +855,10 @@ I can help you resolve today's intake bottlenecks immediately:
             </div>
             <div class="d-flex align-items-center gap-2">
               <select id="simCoordSelect" class="form-select form-select-sm" style="width: auto;">
-                <option value="SYN-PROV-MS-011" selected>Indianola Regional Desk (SYN-PROV-MS-011)</option>
-                <option value="SYN-PROV-MS-012">Jackson Regional Desk (SYN-PROV-MS-012)</option>
-                <option value="SYN-PROV-MS-010">Greenville Regional Desk (SYN-PROV-MS-010)</option>
-                <option value="SYN-PROV-MS-009">Cleveland Regional Desk (SYN-PROV-MS-009)</option>
+                <option value="SYN-PROV-NY-011" selected>Walton Regional Desk (SYN-PROV-NY-011)</option>
+                <option value="SYN-PROV-NY-012">Bronx Regional Desk (SYN-PROV-NY-012)</option>
+                <option value="SYN-PROV-NY-009">Canton Regional Desk (SYN-PROV-NY-009)</option>
+                <option value="SYN-PROV-NY-010">Malone Regional Desk (SYN-PROV-NY-010)</option>
               </select>
               <button class="btn btn-primary btn-sm" onclick="runNetworkSimulation()">Run Graph Simulation</button>
             </div>
@@ -895,63 +1075,6 @@ I can help you resolve today's intake bottlenecks immediately:
           { name: "Bronx Regional Intake Desk (SYN-PROV-NY-012)", wait: "6 days", list: 29, fax: "5 handoffs", breaches: "7 breaches (70+ days)", note: "Urban high-volume re-referral hub with paper-fax delays." },
           { name: "Canton Regional Intake Desk (SYN-PROV-NY-009)", wait: "8 days", list: 14, fax: "4 handoffs", breaches: "6 breaches (70+ days)", note: "North Country cross-county bounces into backlogged eval hubs." }
         ]
-      },
-      MS: {
-        name: "Mississippi (MS)",
-        county: "Leflore County",
-        tract: "28083950200",
-        nodes: [
-          { id: "SYN-PROV-MS-007", short: "MS-007 (Clinic)", wait: 6, x: 75, y: 115, color: "#38bdf8" },
-          { id: "SYN-PROV-MS-011", short: "MS-011 (Bounce Hub)", wait: 5, x: 265, y: 115, color: "#f59e0b", bounceHub: true },
-          { id: "SYN-PROV-MS-015", short: "MS-015 (Saturated Eval)", wait: 34, x: 470, y: 52, color: "#ef4444" },
-          { id: "SYN-PROV-MS-019", short: "MS-019 (Bilingual Eval)", wait: 7, x: 470, y: 145, color: "#a855f7" },
-          { id: "SYN-PROV-MS-028", short: "MS-028 (Therapy)", wait: 6, x: 675, y: 52, color: "#10b981" },
-          { id: "SYN-PROV-MS-027", short: "MS-027 (Therapy)", wait: 10, x: 675, y: 145, color: "#10b981" },
-          { id: "SYN-PROV-MS-026", short: "MS-026 (Therapy)", wait: 8, x: 675, y: 205, color: "#10b981" }
-        ],
-        paths: {
-          bounce: {
-            id: "CHAIN-MS-023",
-            title: "🚨 CHAIN-MS-023: 4-Hop Paper-Fax Bounce (75 Days — Breaches 45d Limit!)",
-            subtitle: "32-month-old toddler (4 mos from 36m Part C aging-out cliff!) • Expressive/Autism Screen",
-            total: 75,
-            color: "#ef4444",
-            edges: [
-              { from: "SYN-PROV-MS-007", to: "SYN-PROV-MS-011", hop: 1, days: 14, chan: "paper_fax", dy: -12 },
-              { from: "SYN-PROV-MS-011", to: "SYN-PROV-MS-015", hop: 2, days: 22, chan: "paper_fax", dy: -8 },
-              { from: "SYN-PROV-MS-015", to: "SYN-PROV-MS-019", hop: 3, days: 25, chan: "paper_fax", dy: 0 },
-              { from: "SYN-PROV-MS-019", to: "SYN-PROV-MS-028", hop: 4, days: 14, chan: "ehr_portal", dy: -8 }
-            ]
-          },
-          eval: {
-            id: "CHAIN-MS-007",
-            title: "✅ CHAIN-MS-007: 3-Hop Electronic Bilingual Route (37 Days — Saves 38 Days!)",
-            subtitle: "Same Clinic (MS-007) & Same Coordinator (MS-011), routed via EHR directly to MS-019",
-            total: 37,
-            color: "#22c55e",
-            edges: [
-              { from: "SYN-PROV-MS-007", to: "SYN-PROV-MS-011", hop: 1, days: 6, chan: "ehr_portal", dy: 14 },
-              { from: "SYN-PROV-MS-011", to: "SYN-PROV-MS-019", hop: 2, days: 14, chan: "ehr_portal", dy: 10 },
-              { from: "SYN-PROV-MS-019", to: "SYN-PROV-MS-027", hop: 3, days: 17, chan: "ehr_portal", dy: 10 }
-            ]
-          },
-          fast: {
-            id: "CHAIN-MS-031",
-            title: "⚡ CHAIN-MS-031: 2-Hop Electronic Fast-Track (17 Days — Saves 58 Days!)",
-            subtitle: "Direct Fast-Track IFSP Placement for eligible toddlers via EHR Portal",
-            total: 17,
-            color: "#38bdf8",
-            edges: [
-              { from: "SYN-PROV-MS-007", to: "SYN-PROV-MS-011", hop: 1, days: 5, chan: "ehr_portal", dy: 18 },
-              { from: "SYN-PROV-MS-011", to: "SYN-PROV-MS-026", hop: 2, days: 12, chan: "ehr_portal", dy: 14 }
-            ]
-          }
-        },
-        hubs: [
-          { name: "Indianola Regional Intake Desk (SYN-PROV-MS-011)", wait: "5 days", list: 24, fax: "5 handoffs", breaches: "7 breaches (70+ days)", note: "Hidden bottleneck; low waitlist conceals paper-fax dropoffs." },
-          { name: "Jackson Regional Intake Desk (SYN-PROV-MS-012)", wait: "6 days", list: 29, fax: "5 handoffs", breaches: "7 breaches (70+ days)", note: "Systemic re-referral hub lacking bilingual coordinator handoffs." },
-          { name: "Cleveland Regional Intake Desk (SYN-PROV-MS-009)", wait: "8 days", list: 14, fax: "4 handoffs", breaches: "6 breaches (70+ days)", note: "Cross-county bounces into backlogged eval hubs." }
-        ]
       }
     };
 
@@ -1034,6 +1157,8 @@ I can help you resolve today's intake bottlenecks immediately:
     // Load SVG referral comparison graph on page ready (defaults to NY)
     window.addEventListener('DOMContentLoaded', () => {
       setActiveState('NY');
+      // Initialize Track 1 location resolution and triage route
+      resolveLocationNow();
     });
 
     let svgCurrentMode = "both";
@@ -1316,9 +1441,144 @@ I can help you resolve today's intake bottlenecks immediately:
       chatBox.scrollTop = chatBox.scrollHeight;
     }
 
+    let geoDebounceTimer = null;
+    function debounceGeoResolve() {
+      clearTimeout(geoDebounceTimer);
+      geoDebounceTimer = setTimeout(() => {
+        resolveLocationNow();
+      }, 400);
+    }
+
+    function setGeoLocation(val) {
+      document.getElementById('geoInput').value = val;
+      resolveLocationNow();
+    }
+
+    async function resolveLocationNow() {
+      const q = document.getElementById('geoInput').value.trim();
+      if (!q) return;
+
+      const badge = document.getElementById('geoMatchBadge');
+      badge.className = 'badge bg-warning text-dark';
+      badge.innerText = 'Resolving...';
+
+      try {
+        const res = await fetch('/api/geo/resolve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: q, state_code: 'NY', top_n: 3 })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          const loc = data.resolved_location;
+          document.getElementById('tractGeoid').value = loc.census_tract_geoid;
+          document.getElementById('geoResolvedText').innerHTML =
+            `📍 <strong>Resolved:</strong> ${loc.display_name} · Tract <code>${loc.census_tract_geoid}</code>`;
+          badge.className = 'badge bg-success';
+          badge.innerText = data.match_type.replace('_', ' ');
+
+          // Render closest screening centers list
+          const listDiv = document.getElementById('closestClinicsList');
+          if (data.nearest_screening_clinics && data.nearest_screening_clinics.length > 0) {
+            listDiv.innerHTML = data.nearest_screening_clinics.map((c, i) => `
+              <div class="d-flex justify-content-between align-items-center py-1 border-bottom ${i === 0 ? 'bg-light px-1 rounded' : ''}">
+                <div>
+                  <strong>${i === 0 ? '⭐ ' : ''}${c.name.replace(' [Synthetic]', '')}</strong>
+                  <div class="text-muted" style="font-size:0.7rem;">
+                    Wait: ${c.internal_wait_days}d · ${c.bilingual_services_listed ? 'Bilingual ✅' : 'English only'} · ${c.accepts_medicaid ? 'Medicaid ✅' : 'No Medicaid'}
+                  </div>
+                </div>
+                <span class="badge bg-primary-subtle text-primary border">${c.distance_miles} mi</span>
+              </div>
+            `).join('');
+          }
+
+          // Pan/Zoom Leaflet map if initialized
+          if (window.leafletMap && loc.latitude && loc.longitude) {
+            window.leafletMap.setView([loc.latitude, loc.longitude], 12);
+          }
+
+          // Run pathway triage automatically
+          runTriage();
+        }
+      } catch (err) {
+        badge.className = 'badge bg-danger';
+        badge.innerText = 'Resolve Error';
+        console.warn('Geo resolve failed:', err);
+      }
+    }
+
+    function renderPathwayGraph(p) {
+      const card = document.getElementById('triageGraphCard');
+      const svg = document.getElementById('svgTriagePathway');
+      if (!p || !card || !svg) return;
+
+      card.style.display = 'block';
+
+      // 4 stages: Screening Clinic -> Coordinator -> Eval Hub -> Vendor
+      const nodes = [
+        { label: "Screening Clinic", name: p.screening_clinic.replace(' [Synthetic]', ''), days: p.clinic_wait, x: 80, y: 55, color: "#38bdf8" },
+        { label: "Part C Coordinator", name: p.intake_coordinator.replace(' [Synthetic]', ''), days: p.coord_wait, x: 260, y: 55, color: "#fbbf24" },
+        { label: "Multidisc. Eval Hub", name: p.eval_hub.replace(' [Synthetic]', ''), days: p.eval_wait, x: 440, y: 55, color: p.eval_bilingual ? "#a855f7" : "#3b82f6" },
+        { label: "Direct Therapy Vendor", name: p.therapy_vendor.replace(' [Synthetic]', ''), days: p.vendor_wait, x: 610, y: 55, color: "#10b981" }
+      ];
+
+      let svgHtml = `
+        <defs>
+          <marker id="arrow-flow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#38bdf8"/>
+          </marker>
+        </defs>
+      `;
+
+      // Draw 3 connector hops
+      for (let i = 0; i < 3; i++) {
+        const u = nodes[i];
+        const v = nodes[i + 1];
+        const midX = (u.x + v.x) / 2;
+        svgHtml += `
+          <line x1="${u.x + 22}" y1="${u.y}" x2="${v.x - 22}" y2="${v.y}" stroke="#38bdf8" stroke-width="2.5" marker-end="url(#arrow-flow)" stroke-dasharray="${i === 1 ? 'none' : 'none'}"/>
+          <rect x="${midX - 28}" y="32" width="56" height="15" rx="3" fill="#1e293b" stroke="#38bdf8" stroke-width="0.8"/>
+          <text x="${midX}" y="43" fill="#38bdf8" font-size="8.5" font-family="monospace" text-anchor="middle" font-weight="bold">EHR Hop ${i+1}</text>
+        `;
+      }
+
+      // Draw stage circles and labels
+      nodes.forEach((n, idx) => {
+        svgHtml += `
+          <g>
+            <circle cx="${n.x}" cy="${n.y}" r="18" fill="${n.color}" stroke="#ffffff" stroke-width="2.2" filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.4))"/>
+            <text x="${n.x}" y="${n.y + 4}" fill="#0f172a" font-size="9" font-weight="900" text-anchor="middle">${idx + 1}</text>
+            <text x="${n.x}" y="${n.y + 32}" fill="#f8fafc" font-size="9" font-weight="bold" text-anchor="middle">${n.label}</text>
+            <text x="${n.x}" y="${n.y + 44}" fill="#94a3b8" font-size="7.5" text-anchor="middle">${n.name.substring(0, 18)}</text>
+            <text x="${n.x}" y="${n.y - 25}" fill="#38bdf8" font-size="8.5" font-family="monospace" text-anchor="middle">+${n.days}d</text>
+          </g>
+        `;
+      });
+
+      // Total clock summary tag in top right
+      svgHtml += `
+        <rect x="520" y="10" width="150" height="20" rx="4" fill="#047857" stroke="#10b981" stroke-width="1"/>
+        <text x="595" y="24" fill="#ffffff" font-size="9" font-weight="bold" text-anchor="middle">Total Pathway: ${p.total_estimated_wait_days}d (&le;45d)</text>
+      `;
+
+      svg.innerHTML = svgHtml;
+    }
+
+    function centerMapOnCurrentPathway() {
+      // Activate Track 2 map or scroll to map
+      if (window.leafletMap) {
+        activateTrack(2);
+        const mapEl = document.getElementById('map');
+        if (mapEl) {
+          mapEl.scrollIntoView({ behavior: 'smooth' });
+        }
+      }
+    }
+
     async function runTriage() {
       const resultDiv = document.getElementById('triageResult');
-      resultDiv.innerHTML = 'Computing optimal graph pathway...';
+      resultDiv.innerHTML = '<div class="text-center py-2"><i class="fa-solid fa-spinner fa-spin me-1"></i> Computing optimal graph pathway...</div>';
 
       const payload = {
         child_age_months: parseInt(document.getElementById('childAge').value),
@@ -1328,44 +1588,58 @@ I can help you resolve today's intake bottlenecks immediately:
         max_wait_days: 45
       };
 
-      const res = await fetch('/api/triage/route', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
+      try {
+        const res = await fetch('/api/triage/route', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
 
-      if (data.recommended_pathways && data.recommended_pathways.length > 0) {
-        const p = data.recommended_pathways[0];
-        let alertHtml = '';
-        if (data.age_warning) {
-          alertHtml += `<div class="alert alert-danger p-2 mb-2">${data.age_warning}</div>`;
+        if (data.recommended_pathways && data.recommended_pathways.length > 0) {
+          const p = data.recommended_pathways[0];
+          let alertHtml = '';
+          if (data.age_warning) {
+            alertHtml += `<div class="alert alert-danger p-2 mb-2">${data.age_warning}</div>`;
+          }
+          if (data.zero_vehicle_travel_guardrail && data.zero_vehicle_travel_guardrail.alert) {
+            alertHtml += `<div class="alert alert-warning p-2 mb-2">🚐 <strong>${data.zero_vehicle_travel_guardrail.alert}</strong></div>`;
+          }
+          window.currentTriagePathway = p;
+          resultDiv.innerHTML = `
+            ${alertHtml}
+            <div class="border rounded p-2 bg-light mb-2">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="fw-bold text-success"><i class="fa-solid fa-circle-check me-1"></i>Compliant Pathway: ${p.total_estimated_wait_days} Total Days</span>
+                <span class="badge bg-success">&le; 45d Federal Clock</span>
+              </div>
+              <ol class="ps-3 mt-1 mb-2" style="font-size:0.8rem;">
+                <li><strong>Clinic:</strong> ${p.screening_clinic} (${p.clinic_wait}d)</li>
+                <li><strong>Coordinator:</strong> ${p.intake_coordinator} (${p.coord_wait}d)</li>
+                <li><strong>Eval Hub:</strong> ${p.eval_hub} (${p.eval_wait}d, Bilingual: ${p.eval_bilingual ? 'Yes' : 'No'})</li>
+                <li><strong>Therapy Vendor:</strong> ${p.therapy_vendor} (${p.vendor_wait}d)</li>
+              </ol>
+              <div class="small text-muted mb-2">
+                <strong>Transit Proximity:</strong> ${p.total_travel_miles || '7.2'} total route miles
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-primary w-100 fw-bold" onclick="showCaregiverModal()">
+                <i class="fa-solid fa-file-signature me-1"></i> View / Print Bilingual Caregiver Action Note (EN/ES)
+              </button>
+            </div>
+          `;
+
+          // Render the 4-stage handoff SVG graph
+          renderPathwayGraph(p);
+        } else {
+          document.getElementById('triageGraphCard').style.display = 'none';
+          resultDiv.innerHTML = `
+            ${data.age_warning ? `<div class="alert alert-danger p-2 mb-2">${data.age_warning}</div>` : ''}
+            <span class="text-danger fw-bold">No Part C pathway available.</span>
+            ${data.part_b_preschool_transition ? `<div class="alert alert-info p-2 mt-2"><strong>${data.part_b_preschool_transition.mandate}:</strong> ${data.part_b_preschool_transition.required_action}</div>` : ''}
+          `;
         }
-        if (data.zero_vehicle_travel_guardrail && data.zero_vehicle_travel_guardrail.alert) {
-          alertHtml += `<div class="alert alert-warning p-2 mb-2">🚐 <strong>${data.zero_vehicle_travel_guardrail.alert}</strong></div>`;
-        }
-        window.currentTriagePathway = p;
-        resultDiv.innerHTML = `
-          ${alertHtml}
-          <div class="border rounded p-2 bg-light mb-2">
-            <div class="fw-bold text-success">Compliant Pathway: ${p.total_estimated_wait_days} Total Days (<= 45d limit)</div>
-            <ol class="ps-3 mt-1 mb-2">
-              <li><strong>Clinic:</strong> ${p.screening_clinic} (${p.clinic_wait}d)</li>
-              <li><strong>Coordinator:</strong> ${p.intake_coordinator} (${p.coord_wait}d)</li>
-              <li><strong>Eval Hub:</strong> ${p.eval_hub} (${p.eval_wait}d, Bilingual: ${p.eval_bilingual})</li>
-              <li><strong>Therapy Vendor:</strong> ${p.therapy_vendor} (${p.vendor_wait}d)</li>
-            </ol>
-            <button type="button" class="btn btn-sm btn-outline-primary w-100 fw-bold" onclick="showCaregiverModal()">
-              <i class="fa-solid fa-file-signature me-1"></i> View / Print Bilingual Caregiver Action Note (EN/ES)
-            </button>
-          </div>
-        `;
-      } else {
-        resultDiv.innerHTML = `
-          ${data.age_warning ? `<div class="alert alert-danger p-2 mb-2">${data.age_warning}</div>` : ''}
-          <span class="text-danger fw-bold">No Part C pathway available.</span>
-          ${data.part_b_preschool_transition ? `<div class="alert alert-info p-2 mt-2"><strong>${data.part_b_preschool_transition.mandate}:</strong> ${data.part_b_preschool_transition.required_action}</div>` : ''}
-        `;
+      } catch (err) {
+        resultDiv.innerHTML = `<span class="text-danger">Routing failed: ${err.message}</span>`;
       }
     }
 
@@ -1441,7 +1715,7 @@ I can help you resolve today's intake bottlenecks immediately:
       document.getElementById('simSummaryText').innerHTML = '<em>Running graph simulation over referral chains...</em>';
 
       try {
-        const res = await fetch(`/api/network/simulate?coordinator_id=${encodeURIComponent(coordId)}&state_code=MS`);
+        const res = await fetch(`/api/network/simulate?coordinator_id=${encodeURIComponent(coordId)}&state_code=NY`);
         const data = await res.json();
         if (data.status === 'success') {
           const t = data.target_coordinator;

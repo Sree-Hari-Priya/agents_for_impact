@@ -1002,18 +1002,20 @@ def simulate_single_network_fix(
 
     try:
         bq = get_bq_client()
-        prov_df = bq.query(
+        prov_rows = _bq_to_records(bq, 
             f"SELECT provider_id, synthetic_organization_name, node_role, state_code "
             f"FROM `{DATASET_ID}.pediatric_and_ei_provider_directory` "
             f"WHERE node_role = 'Part_C_Intake_Coordinator' AND state_code = '{target_state}'"
-        ).to_dataframe()
-        ref_df = bq.query(
+        )
+        prov_df = pd.DataFrame(prov_rows)
+        ref_rows = _bq_to_records(bq,
             f"SELECT referral_event_id, case_chain_id, hop_sequence, state_code, child_age_months, "
             f"concern_domain, source_provider_id, target_provider_id, handoff_reason, transmission_channel, "
             f"handoff_wait_days "
             f"FROM `{DATASET_ID}.deidentified_part_c_referral_logs` "
             f"WHERE state_code = '{target_state}'"
-        ).to_dataframe()
+        )
+        ref_df = pd.DataFrame(ref_rows)
         if prov_df.empty or ref_df.empty:
             raise ValueError("Target state not found in BigQuery, falling back to local parquets")
         execution_mode = "bigquery_iso_gql"
@@ -1270,4 +1272,188 @@ def validate_pre_handoff_packet(
         "safe_transmission_channel": "ehr_portal" if is_complete else "HOLD_TRANSMISSION",
         "audit_note": "Pre-handoff validation prevents multi-hop paper-fax bounce loops (Challenge 04 Milestone).",
     }
+
+
+def resolve_geographic_location_and_nearest_clinics(
+    query: str,
+    state_code: str = "NY",
+    top_n: int = 3
+) -> Dict[str, Any]:
+    """
+    Resolves natural geographic input (ZIP Code, City/Borough, or Census Tract GEOID)
+    to the matching Census Tract, geographic coordinates, and top closest pediatric screening centers.
+    
+    Provides spatial routing for the Track 1 Router Agent and prepares structured coordinates
+    for Google Maps API / Google ADK MCP toolsets.
+    """
+    clean_q = str(query).strip()
+    target_state = state_code.upper()
+
+    # Known regional centers & ZIP code dictionary for New York
+    NY_ZIP_MAP = {
+        "10451": {"name": "Bronx (Mott Haven / Grand Concourse)", "county": "Bronx County", "lat": 40.8187, "lon": -73.9254, "tract": "36005019700"},
+        "10452": {"name": "Bronx (Highbridge / Jerome Ave)", "county": "Bronx County", "lat": 40.8367, "lon": -73.9254, "tract": "36005019900"},
+        "10453": {"name": "Bronx (Morris Heights / University)", "county": "Bronx County", "lat": 40.8520, "lon": -73.9011, "tract": "36005038100"},
+        "10457": {"name": "Bronx (Tremont / Belmont)", "county": "Bronx County", "lat": 40.8492, "lon": -73.8965, "tract": "36005019700"},
+        "10458": {"name": "Bronx (Fordham / Bedford Park)", "county": "Bronx County", "lat": 40.8654, "lon": -73.8920, "tract": "36005027300"},
+        "10467": {"name": "Bronx (Norwood / Williamsbridge)", "county": "Bronx County", "lat": 40.8750, "lon": -73.8700, "tract": "36005004200"},
+        "10472": {"name": "Bronx (Soundview / Parkchester)", "county": "Bronx County", "lat": 40.8332, "lon": -73.8755, "tract": "36005006200"},
+        "14094": {"name": "Lockport (Niagara County)", "county": "Niagara County", "lat": 43.1706, "lon": -78.6903, "tract": "36063023901"},
+        "14701": {"name": "Jamestown (Chautauqua County)", "county": "Chautauqua County", "lat": 42.0970, "lon": -79.2353, "tract": "36013037100"},
+        "13617": {"name": "Canton (St. Lawrence County)", "county": "St. Lawrence County", "lat": 44.5962, "lon": -75.1699, "tract": "36089490300"},
+        "12953": {"name": "Malone (Franklin County)", "county": "Franklin County", "lat": 44.8489, "lon": -74.2952, "tract": "36033951100"},
+        "13856": {"name": "Walton (Delaware County)", "county": "Delaware County", "lat": 42.1687, "lon": -75.1299, "tract": "36025970300"},
+        "14201": {"name": "Buffalo (Erie / Western NY)", "county": "Niagara County", "lat": 42.8962, "lon": -78.8784, "tract": "36063023901"},
+        "10001": {"name": "New York City (Manhattan)", "county": "Bronx County", "lat": 40.7501, "lon": -73.9967, "tract": "36005019700"},
+        "12207": {"name": "Albany (Capital Region)", "county": "Delaware County", "lat": 42.6526, "lon": -73.7562, "tract": "36025970300"},
+    }
+
+    NY_CITY_MAP = {
+        "bronx": {"name": "Bronx Borough / County", "county": "Bronx County", "lat": 40.8448, "lon": -73.8648, "tract": "36005019700"},
+        "new york": {"name": "New York / Bronx Service Area", "county": "Bronx County", "lat": 40.8367, "lon": -73.9254, "tract": "36005019900"},
+        "nyc": {"name": "New York City (Bronx Area)", "county": "Bronx County", "lat": 40.8367, "lon": -73.9254, "tract": "36005019900"},
+        "lockport": {"name": "Lockport (Niagara County)", "county": "Niagara County", "lat": 43.1706, "lon": -78.6903, "tract": "36063023901"},
+        "niagara": {"name": "Niagara County", "county": "Niagara County", "lat": 43.1561, "lon": -78.6931, "tract": "36063023901"},
+        "jamestown": {"name": "Jamestown (Chautauqua County)", "county": "Chautauqua County", "lat": 42.0970, "lon": -79.2353, "tract": "36013037100"},
+        "chautauqua": {"name": "Chautauqua County", "county": "Chautauqua County", "lat": 42.0990, "lon": -79.3376, "tract": "36013037100"},
+        "canton": {"name": "Canton (St. Lawrence County)", "county": "St. Lawrence County", "lat": 44.5962, "lon": -75.1699, "tract": "36089490300"},
+        "st lawrence": {"name": "St. Lawrence County", "county": "St. Lawrence County", "lat": 44.9443, "lon": -74.8151, "tract": "36089490300"},
+        "malone": {"name": "Malone (Franklin County)", "county": "Franklin County", "lat": 44.8489, "lon": -74.2952, "tract": "36033951100"},
+        "franklin": {"name": "Franklin County", "county": "Franklin County", "lat": 44.3122, "lon": -74.4742, "tract": "36033951100"},
+        "walton": {"name": "Walton (Delaware County)", "county": "Delaware County", "lat": 42.1687, "lon": -75.1299, "tract": "36025970300"},
+        "delaware": {"name": "Delaware County", "county": "Delaware County", "lat": 42.3303, "lon": -75.1105, "tract": "36025970300"},
+        "buffalo": {"name": "Buffalo (Western NY / Niagara)", "county": "Niagara County", "lat": 42.8962, "lon": -78.8784, "tract": "36063023901"},
+    }
+
+    resolved_lat = None
+    resolved_lon = None
+    resolved_name = None
+    resolved_tract = None
+    resolved_county = None
+    match_type = "unknown"
+
+    # 1. Check if 11-digit Census Tract GEOID
+    digits_only = "".join(c for c in clean_q if c.isdigit())
+    if len(digits_only) == 11 and digits_only.startswith("36"):
+        resolved_tract = digits_only
+        match_type = "census_tract_geoid"
+    elif len(digits_only) == 5 and digits_only in NY_ZIP_MAP:
+        z_match = NY_ZIP_MAP[digits_only]
+        resolved_lat = z_match["lat"]
+        resolved_lon = z_match["lon"]
+        resolved_name = f"ZIP {digits_only} — {z_match['name']}"
+        resolved_tract = z_match["tract"]
+        resolved_county = z_match["county"]
+        match_type = "zip_code"
+    else:
+        # Check city string matching
+        q_lower = clean_q.lower()
+        for city_key, city_data in NY_CITY_MAP.items():
+            if city_key in q_lower:
+                resolved_lat = city_data["lat"]
+                resolved_lon = city_data["lon"]
+                resolved_name = city_data["name"]
+                resolved_tract = city_data["tract"]
+                resolved_county = city_data["county"]
+                match_type = "city_name"
+                break
+
+    # If tract was provided directly or needs lat/lon lookup from BigQuery/Parquet
+    try:
+        bq = get_bq_client()
+        if resolved_tract and (resolved_lat is None or resolved_lon is None):
+            t_rows = _bq_to_records(
+                bq,
+                f"SELECT census_tract_geoid, county_name, latitude, longitude, poverty_rate, no_vehicle_rate "
+                f"FROM `{DATASET_ID}.acs_under5_tract_demographics` "
+                f"WHERE census_tract_geoid = '{resolved_tract}' LIMIT 1"
+            )
+            if t_rows:
+                resolved_lat = float(t_rows[0]["latitude"])
+                resolved_lon = float(t_rows[0]["longitude"])
+                resolved_county = t_rows[0]["county_name"]
+                resolved_name = f"Census Tract {resolved_tract} ({resolved_county})"
+
+        if resolved_lat is None or resolved_lon is None:
+            # Fallback to default Bronx tract
+            resolved_tract = "36005019700"
+            resolved_county = "Bronx County"
+            resolved_name = f"{clean_q} (Resolved to Bronx Central Intake: Tract {resolved_tract})"
+            resolved_lat = 40.818744
+            resolved_lon = -73.937447
+            match_type = "regional_default_fallback"
+
+        # Query screening clinics with distance from resolved lat/lon
+        clinic_sql = f"""
+        SELECT provider_id, synthetic_organization_name, latitude, longitude,
+               median_internal_wait_days, accepts_medicaid, bilingual_services_listed,
+               ROUND(ST_DISTANCE(ST_GEOGPOINT({resolved_lon}, {resolved_lat}), provider_geom) / 1609.344, 2) AS distance_miles
+        FROM `{DATASET_ID}.pediatric_and_ei_provider_directory`
+        WHERE node_role = 'Screening_Pediatric_Clinic' AND state_code = '{target_state}'
+        ORDER BY distance_miles ASC
+        LIMIT {top_n}
+        """
+        clinic_rows = _bq_to_records(bq, clinic_sql)
+    except Exception:
+        # Local GeoParquet / Haversine fallback
+        if resolved_lat is None or resolved_lon is None:
+            resolved_tract = "36005019700"
+            resolved_county = "Bronx County"
+            resolved_name = f"{clean_q} (Bronx Central Intake)"
+            resolved_lat = 40.818744
+            resolved_lon = -73.937447
+            match_type = "fallback"
+
+        prov_df = _load_local_parquet("pediatric_and_ei_provider_directory", state_code=target_state)
+        clinics = prov_df[prov_df["node_role"] == "Screening_Pediatric_Clinic"].copy()
+        clinics["distance_miles"] = clinics.apply(
+            lambda row: round(_haversine_miles(resolved_lat, resolved_lon, row["latitude"], row["longitude"]), 2),
+            axis=1
+        )
+        clinics = clinics.sort_values("distance_miles").head(top_n)
+        clinic_rows = clinics[[
+            "provider_id", "synthetic_organization_name", "latitude", "longitude",
+            "median_internal_wait_days", "accepts_medicaid", "bilingual_services_listed",
+            "distance_miles"
+        ]].to_dict("records")
+
+    nearest_clinics = []
+    for c in clinic_rows:
+        nearest_clinics.append({
+            "provider_id": c["provider_id"],
+            "name": c["synthetic_organization_name"],
+            "distance_miles": float(c["distance_miles"]),
+            "internal_wait_days": int(c["median_internal_wait_days"]),
+            "accepts_medicaid": bool(c["accepts_medicaid"]),
+            "bilingual_services_listed": bool(c["bilingual_services_listed"]),
+            "latitude": float(c["latitude"]),
+            "longitude": float(c["longitude"]),
+            "google_maps_pin": {
+                "lat": float(c["latitude"]),
+                "lng": float(c["longitude"]),
+                "title": c["synthetic_organization_name"]
+            }
+        })
+
+    return {
+        "status": "success",
+        "input_query": clean_q,
+        "match_type": match_type,
+        "resolved_location": {
+            "display_name": resolved_name,
+            "census_tract_geoid": resolved_tract,
+            "county_name": resolved_county,
+            "latitude": round(resolved_lat, 6),
+            "longitude": round(resolved_lon, 6),
+            "state_code": target_state
+        },
+        "nearest_screening_clinics": nearest_clinics,
+        "recommended_screening_clinic": nearest_clinics[0] if nearest_clinics else None,
+        "google_maps_geopoint": {
+            "center": {"lat": round(resolved_lat, 6), "lng": round(resolved_lon, 6)},
+            "zoom": 13 if match_type in ("zip_code", "census_tract_geoid") else 10
+        },
+        "synthetic_disclosure": "NOTICE: Screening centers are 100% [Synthetic] simulated records."
+    }
+
 
