@@ -23,6 +23,7 @@ from agent.tools import (
     format_bilingual_caregiver_note,
     get_state_geospatial_graph_data,
     simulate_single_network_fix,
+    validate_pre_handoff_packet,
 )
 from google.adk import Runner
 from google.adk.sessions import InMemorySessionService
@@ -100,6 +101,29 @@ def triage_route(req: TriageRequest):
 @app.get("/api/audit/equity")
 def equity_audit():
     return run_equity_and_counterfactual_audit()
+
+class PacketValidateRequest(BaseModel):
+    child_age_months: int = 22
+    primary_home_language: str = "Spanish"
+    insurance_type: str = "Medicaid"
+    target_coordinator_id: str = "SYN-PROV-NY-011"
+    target_eval_hub_id: Optional[str] = "SYN-PROV-NY-019"
+    screening_tool_administered: bool = True
+    consent_signed: bool = True
+    state_code: str = "NY"
+
+@app.post("/api/packet/validate")
+def validate_packet(req: PacketValidateRequest):
+    return validate_pre_handoff_packet(
+        child_age_months=req.child_age_months,
+        primary_home_language=req.primary_home_language,
+        insurance_type=req.insurance_type,
+        target_coordinator_id=req.target_coordinator_id,
+        target_eval_hub_id=req.target_eval_hub_id,
+        screening_tool_administered=req.screening_tool_administered,
+        consent_signed=req.consent_signed,
+        state_code=req.state_code,
+    )
 
 @app.get("/api/graph/map")
 def get_map_graph(state_code: str = "NY"):
@@ -253,11 +277,10 @@ def index():
           </div>
         </div>
         <div class="text-end">
-          <div class="btn-group btn-group-sm mb-1" role="group">
-            <button id="btnStateNY" type="button" class="btn btn-warning fw-bold text-dark" onclick="setActiveState('NY')"><i class="fa-solid fa-map-pin me-1"></i> New York (NY)</button>
-            <button id="btnStateMS" type="button" class="btn btn-outline-light" onclick="setActiveState('MS')"><i class="fa-solid fa-map-pin me-1"></i> Mississippi (MS)</button>
+          <div class="d-inline-flex align-items-center gap-2 bg-warning text-dark px-3 py-1 rounded-pill fw-bold small shadow-sm">
+            <i class="fa-solid fa-map-pin text-danger"></i> State: New York (NY · FIPS 36)
           </div>
-          <div class="small mt-1 text-white-50">100% [Synthetic] Topology · Illustrative Media</div>
+          <div class="small mt-1 text-white-50">89 Census Tracts · 30 CareNodes · 100% [Synthetic] Network</div>
         </div>
       </div>
 
@@ -345,7 +368,7 @@ def index():
               <div class="col-6">
                 <label class="form-label small fw-semibold mb-1">Census Tract GEOID</label>
                 <input type="text" id="tractGeoid" class="form-control" value="36005019700">
-                <span class="text-muted" style="font-size:0.72rem;">NY: 36005019700 · MS: 28083950200</span>
+                <span class="text-muted" style="font-size:0.72rem;">Default: 36005019700 (Bronx County, NY)</span>
               </div>
             </div>
 
@@ -387,7 +410,8 @@ I can help you resolve today's intake bottlenecks immediately:
 • <strong>Compliant Routing:</strong> "Route a 22-month-old Spanish-speaking Medicaid toddler near tract 36005019700."
 • <strong>Network Fix Simulation:</strong> "Simulate network fix: how many breached cases drop under 45 days if Indianola intake coordinator switches to electronic intake with pre-checked bilingual slots?"
 • <strong>Caregiver Notes:</strong> "Generate bilingual caregiver action notes for the Rivera family and toddler Mateo."
-• <strong>Transit Check:</strong> "Does tract 28083950200 trigger the zero-vehicle transit guardrail?"</div>
+• <strong>Transit Check:</strong> "Does Bronx tract 36005019700 trigger the zero-vehicle transit guardrail?"
+• <strong>Packet Audit:</strong> "Validate pre-handoff packet completeness for a 32-month-old Spanish Medicaid toddler to coordinator SYN-PROV-NY-011."</div>
             </div>
             <div class="input-group">
               <input type="text" id="userInput" class="form-control py-2" placeholder="Ask your question (e.g. Find a <=45d path for today's toddler)..." onkeydown="if(event.key==='Enter') sendMessage()">

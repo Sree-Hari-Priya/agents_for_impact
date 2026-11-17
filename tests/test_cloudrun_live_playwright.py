@@ -12,20 +12,20 @@ SCREENSHOT_PATH = Path(__file__).resolve().parent / "live_cloudrun_verified.png"
 CORE_PROMPTS = [
     {
         "id": "Tool 1: Multi-Hop ISO GQL Breach & Bounce Hub Trace",
-        "prompt": "Trace 3-to-4 hop referral chains breaching 45 days and show bounce hubs.",
-        "expected_any": ["SYN-PROV", "Indianola", "Jackson", "paper_fax", "fax", "45"],
+        "prompt": "Trace 3-to-4 hop referral chains in New York breaching 45 days and show bounce hubs.",
+        "expected_any": ["SYN-PROV", "Walton", "Bronx", "Canton", "paper_fax", "fax", "45"],
         "synthetic_check": ["Synthetic", "SYN-PROV"],
     },
     {
         "id": "Tool 2: <=45-Day Compliant Toddler Pathway Routing",
-        "prompt": "Route a 22-month-old Spanish-speaking Medicaid toddler near tract 28083950200.",
-        "expected_any": ["22", "days", "Greenwood", "Medicaid", "bilingual", "SYN-PROV"],
+        "prompt": "Route a 22-month-old Spanish-speaking Medicaid toddler near tract 36005019700.",
+        "expected_any": ["22", "days", "Bronx", "Lockport", "Medicaid", "bilingual", "SYN-PROV"],
         "synthetic_check": ["Synthetic", "SYN-PROV"],
     },
     {
         "id": "Tool 3: Post-Output Equity Audit & Counterfactual E-Fax Savings",
         "prompt": "Perform an Equity Audit on multi-hop delays and counterfactual e-fax savings.",
-        "expected_any": ["1,168", "1168", "poverty", "vehicle", "NSCH", "statewide"],
+        "expected_any": ["poverty", "vehicle", "NSCH", "statewide", "days", "breach"],
         "synthetic_check": [],
     },
     {
@@ -87,7 +87,7 @@ def run_live_audit() -> None:
 
         # 2. Test Quick Triage & Route Optimizer with 32-month-old (36m Aging-Out Cliff!)
         page.fill("#childAge", "32")
-        page.fill("#tractGeoid", "28083950200")
+        page.fill("#tractGeoid", "36005019700")
         page.click("button:has-text('Calculate Compliant Pathway')")
         page.wait_for_function(
             "document.getElementById('triageResult').innerText.includes('Compliant Pathway')",

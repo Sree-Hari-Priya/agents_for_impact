@@ -37,7 +37,7 @@ from google.cloud import bigquery
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "qwiklabs-gcp-03-4b836a7f2e04")
 DATASET_ID = os.environ.get("A4I_DATASET", "a4i_early_intervention")
 LOCATION = os.environ.get("A4I_LOCATION", "US")
-DEFAULT_STATE = os.environ.get("A4I_STATE", "MS")
+DEFAULT_STATE = os.environ.get("A4I_STATE", "NY")
 
 FIPS_TO_STATE = {
     "01": "AL",
@@ -54,6 +54,12 @@ DATA_DIR = REPO_ROOT / "data"
 
 def get_bq_client() -> bigquery.Client:
     return bigquery.Client(project=PROJECT_ID, location=LOCATION)
+
+
+def _bq_to_records(client: bigquery.Client, query_str: str) -> List[Dict[str, Any]]:
+    """Safely execute a BigQuery SQL/GQL query and return a list of dicts without requiring db-dtypes."""
+    query_job = client.query(query_str)
+    return [dict(row) for row in query_job.result()]
 
 
 def _load_local_parquet(table_name: str, state_code: str = DEFAULT_STATE) -> pd.DataFrame:
@@ -152,18 +158,20 @@ def trace_45day_breaches_and_bounce_hubs(
     target_state = (state_code or DEFAULT_STATE).strip().upper()
     try:
         bq = get_bq_client()
-        prov_df = bq.query(
+        prov_rows = _bq_to_records(
+            bq,
             f"SELECT provider_id, state_code, synthetic_organization_name, node_role, median_internal_wait_days, "
             f"active_waitlist_count, accepts_medicaid, bilingual_services_listed "
             f"FROM `{DATASET_ID}.pediatric_and_ei_provider_directory`"
-        ).to_dataframe()
-        if not prov_df.empty and "state_code" in prov_df.columns:
-            bq_states = set(prov_df["state_code"].astype(str).str.upper().unique())
+        )
+        if prov_rows and "state_code" in prov_rows[0]:
+            bq_states = {str(r.get("state_code", "")).upper() for r in prov_rows}
             if target_state not in bq_states:
                 raise ValueError(f"BigQuery holds {bq_states}, switching to {target_state} parquet dataset")
-        prov_dict = prov_df.set_index("provider_id").to_dict("index")
-        gql_df = bq.query(gql).to_dataframe()
-        hub_results = bq.query(hub_sql).to_dataframe().to_dict(orient="records")
+        prov_dict = {r["provider_id"]: r for r in prov_rows}
+        gql_records = _bq_to_records(bq, gql)
+        gql_df = pd.DataFrame(gql_records)
+        hub_results = _bq_to_records(bq, hub_sql)
         execution_mode = "bigquery_iso_gql"
     except Exception:
         # Local GeoParquet graph traversal for target_state (e.g. NY or MS)
@@ -408,8 +416,8 @@ def find_compliant_toddler_pathway(
 
     try:
         bq = get_bq_client()
-        gql_verified_chains = bq.query(gql_pathway_query).to_dataframe().to_dict(orient="records")
-        routes = bq.query(sql).to_dataframe().to_dict(orient="records")
+        gql_verified_chains = _bq_to_records(bq, gql_pathway_query)
+        routes = _bq_to_records(bq, sql)
         if not routes:
             raise ValueError(f"Tract {clean_geoid} ({inferred_state}) not in current BQ state load")
     except Exception:
@@ -616,9 +624,10 @@ def run_equity_and_counterfactual_audit() -> Dict[str, Any]:
 
     try:
         bq = get_bq_client()
-        equity_rows = bq.query(equity_sql).to_dataframe().to_dict(orient="records")
-        cf_row = bq.query(counterfactual_sql).to_dataframe().to_dict(orient="records")[0]
-        nsch_rows = bq.query(nsch_sql).to_dataframe().to_dict(orient="records")
+        equity_rows = _bq_to_records(bq, equity_sql)
+        cf_rows = _bq_to_records(bq, counterfactual_sql)
+        cf_row = cf_rows[0] if cf_rows else {}
+        nsch_rows = _bq_to_records(bq, nsch_sql)
     except Exception:
         ref_df = _load_local_parquet("deidentified_part_c_referral_logs")
         acs_df = _load_local_parquet("acs_under5_tract_demographics")
@@ -838,7 +847,6 @@ def get_state_geospatial_graph_data(state_code: str = "NY") -> Dict[str, Any]:
         "all_chains": chains,
     }
 
-
 def simulate_single_network_fix(
     coordinator_id: Optional[str] = None,
     state_code: str = DEFAULT_STATE,
@@ -1034,3 +1042,105 @@ def simulate_single_network_fix(
         ),
         "synthetic_disclosure": "NOTICE: All individual coordinator, clinic, and vendor entities are 100% [Synthetic] simulated records.",
     }
+
+
+def validate_pre_handoff_packet(
+    child_age_months: int,
+    primary_home_language: str,
+    insurance_type: str,
+    target_coordinator_id: str,
+    target_eval_hub_id: Optional[str] = None,
+    screening_tool_administered: bool = True,
+    consent_signed: bool = True,
+    state_code: str = DEFAULT_STATE,
+) -> Dict[str, Any]:
+    """
+    Pre-handoff packet completeness and eligibility validator.
+    Prevents incomplete referral packets from entering downstream multi-hop bounce loops
+    by auditing the 36-month Part C age cliff, Medicaid enrollment, bilingual availability,
+    and downstream coordinator queue capacity before transmission.
+    """
+    st = (state_code or DEFAULT_STATE).strip().upper()
+    prov_dict = {}
+    try:
+        bq = get_bq_client()
+        prov_rows = _bq_to_records(
+            bq,
+            f"SELECT provider_id, synthetic_organization_name, node_role, median_internal_wait_days, "
+            f"active_waitlist_count, accepts_medicaid, bilingual_services_listed "
+            f"FROM `{DATASET_ID}.pediatric_and_ei_provider_directory` WHERE state_code = '{st}'"
+        )
+        prov_dict = {r["provider_id"]: r for r in prov_rows}
+    except Exception:
+        try:
+            prov_df = _load_local_parquet("pediatric_and_ei_provider_directory", state_code=st)
+            prov_dict = prov_df.set_index("provider_id").to_dict("index") if not prov_df.empty else {}
+        except Exception:
+            pass
+
+    errors = []
+    warnings = []
+    recommendations = []
+
+    # 1. 36-month Part C Statutory Age Cliff
+    cliff_urgent = False
+    months_remaining = 36 - child_age_months
+    if child_age_months >= 36:
+        errors.append(
+            f"Child is {child_age_months} months old and has permanently aged out of IDEA Part C (Part B Preschool 619 transition required immediately)."
+        )
+    elif child_age_months >= 30:
+        cliff_urgent = True
+        warnings.append(
+            f"URGENT: Child is {child_age_months} months old (only {months_remaining} months remaining before Part C 36m statutory cliff). "
+            f"Packet must be routed via electronic fast-track to clear evaluation and IFSP within {months_remaining * 30} days."
+        )
+        recommendations.append("Apply expedited fast-track IFSP placement (skip paper-fax queues).")
+
+    # 2. Packet administrative completeness
+    if not consent_signed:
+        errors.append("Parental/Guardian Consent for Evaluation is missing. Transmitting without consent causes an immediate coordinator bounce.")
+    if not screening_tool_administered:
+        warnings.append("Validated developmental screening (ASQ-3/M-CHAT-R) not documented in referral packet.")
+
+    # 3. Target Coordinator Check
+    coord_info = prov_dict.get(target_coordinator_id, {})
+    if not coord_info:
+        warnings.append(f"Coordinator {target_coordinator_id} not verified in regional Part C directory.")
+    else:
+        wait = int(coord_info.get("median_internal_wait_days", 5))
+        waitlist = int(coord_info.get("active_waitlist_count", 0))
+        if waitlist > 25:
+            warnings.append(f"Coordinator {coord_info.get('synthetic_organization_name')} has an active queue of {waitlist} toddlers.")
+
+    # 4. Evaluation Hub Check (Bilingual & Medicaid alignment)
+    is_spanish = "spanish" in primary_home_language.lower() or "es" in primary_home_language.lower()
+    is_medicaid = "medicaid" in insurance_type.lower() or "chip" in insurance_type.lower()
+
+    if target_eval_hub_id:
+        eval_info = prov_dict.get(target_eval_hub_id, {})
+        if eval_info:
+            if is_spanish and not bool(eval_info.get("bilingual_services_listed")):
+                errors.append(
+                    f"Language Access Mismatch: Family speaks {primary_home_language}, but target evaluation hub '{eval_info.get('synthetic_organization_name')}' lacks certified bilingual evaluators. Packet will bounce on Hop 2."
+                )
+                recommendations.append("Re-route to a designated bilingual Part C Multidisciplinary Evaluation Hub (e.g. SYN-PROV-NY-019).")
+            if is_medicaid and not bool(eval_info.get("accepts_medicaid")):
+                errors.append(
+                    f"Insurance Mismatch: Family relies on Medicaid, but '{eval_info.get('synthetic_organization_name')}' does not accept Medicaid. Packet will bounce on Hop 3."
+                )
+                recommendations.append("Select a Medicaid-enrolled evaluation vendor.")
+
+    is_complete = len(errors) == 0
+    return {
+        "status": "ready_for_transmission" if is_complete else "packet_blocked_requires_resolution",
+        "is_complete": is_complete,
+        "age_months": child_age_months,
+        "age_cliff_urgent": cliff_urgent,
+        "blocking_errors": errors,
+        "clinical_warnings": warnings,
+        "corrective_recommendations": recommendations,
+        "safe_transmission_channel": "ehr_portal" if is_complete else "HOLD_TRANSMISSION",
+        "audit_note": "Pre-handoff validation prevents multi-hop paper-fax bounce loops (Challenge 04 Milestone).",
+    }
+

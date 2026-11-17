@@ -6,6 +6,7 @@ from agent.tools import (
     run_equity_and_counterfactual_audit,
     format_bilingual_caregiver_note,
     simulate_single_network_fix,
+    validate_pre_handoff_packet,
 )
 def _build_optional_bq_toolset(default_dataset_id: str) -> list:
     """Attach ADK BigQueryToolset when Google Cloud ADC credentials are active."""
@@ -132,6 +133,7 @@ root_agent = Agent(
             find_compliant_toddler_pathway,
             run_equity_and_counterfactual_audit,
             format_bilingual_caregiver_note,
+            validate_pre_handoff_packet,
         ]
     ),
     sub_agents=[brief_generator_pipeline],
