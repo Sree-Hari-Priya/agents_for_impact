@@ -33,26 +33,24 @@ Across high-poverty urban and rural communities, over **70% of multi-hop referra
 
 ### Slide 2 · Our Team
 
-#### Team Photograph
+#### Official Team Picture & Event Recognition
+
 <div align="center">
+  <br/>
   <a href="https://photos.google.com/photo/AF1QipMMHSDoYXfUEey-G92DeXZLErrHQjA_jP1IpuUi" target="_blank">
-    <img src="https://img.shields.io/badge/📸_Team_Photo-View_on_Google_Photos-blue?style=for-the-badge&logo=google-photos" alt="View Team Photo on Google Photos" height="40" />
+    <img src="https://img.shields.io/badge/📸_OFFICIAL_TEAM_PHOTO-VIEW_FULL_RESOLUTION_ON_GOOGLE_PHOTOS-0b57d0?style=for-the-badge&logo=google-photos&logoColor=white" alt="Team Photo on Google Photos" height="50" />
   </a>
-  <p><em>Click the badge above to view our official team photo on Google Photos: <br/><code>https://photos.google.com/photo/AF1QipMMHSDoYXfUEey-G92DeXZLErrHQjA_jP1IpuUi</code></em></p>
+  <br/><br/>
+  <p><b>Team Lead:</b> Sree Hari Priya &nbsp;|&nbsp; <b>Team:</b> Agents for Impact Team</p>
+  <p><b>Direct Google Photos Link:</b> <a href="https://photos.google.com/photo/AF1QipMMHSDoYXfUEey-G92DeXZLErrHQjA_jP1IpuUi"><code>https://photos.google.com/photo/AF1QipMMHSDoYXfUEey-G92DeXZLErrHQjA_jP1IpuUi</code></a></p>
+  <br/>
 </div>
 
-#### Roster & Event Permissions
-
-| Name | Role / Specialty | Email | Filming Availability<br/>*(11/19 11am–2pm MP7)* | Project Sharing<br/>*(Internal Team)* | Share With<br/>*(Work Emails)* |
-|---|---|---|:---:|:---:|---|
-| **Sree Hari Priya** | Team Lead / Architecture | `team@agents4impact.com` | **Yes** | **Yes** | Work colleagues & team |
-| **Agents for Impact Team** | Agent & Full-Stack Lane | `team@agents4impact.com` | **Yes** | **Yes** | Work colleagues & team |
-| **Data & Graph Lane** | BigQuery ISO GQL / Analytics | `team@agents4impact.com` | **Yes** | **Yes** | Work colleagues & team |
-| **Story & Validation Lane** | Clinical Compliance & Equity | `team@agents4impact.com` | **Yes** | **Yes** | Work colleagues & team |
-
-> [!NOTE]
-> **Filming Availability:** Confirmed **Yes** to return to Google Event Center (MP7) between 11:00 AM – 2:00 PM on Thursday, 11/19 for winner filming.  
-> **Discord Status:** Actively monitoring Discord for winner announcements.
+> [!IMPORTANT]
+> **Event Permissions & Filming Confirmation:**
+> - **Filming Availability (Thursday 11/19 between 11:00 AM – 2:00 PM at MP7):** **YES** (Team is available to return to Google Event Center MP7 to film winning pitch).
+> - **Project Sharing:** **YES** (Approved for internal Google sharing & team dissemination).
+> - **Discord Notifications:** Team is actively monitoring Discord announcements prior to 9:00 PM.
 
 ---
 
