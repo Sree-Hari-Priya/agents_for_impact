@@ -538,7 +538,7 @@ def index():
               🌱 Extra Credit: Simulator
             </button>
             <button id="btnTrack5" type="button" class="btn btn-sm btn-outline-light track-nav-btn" onclick="activateTrack(5)">
-              <i class="fa-solid fa-map-location-dot me-1"></i> 🗺️ Network Map &amp; Traces
+              <i class="fa-solid fa-list-check me-1"></i> 📡 Execution Traces &amp; Audit
             </button>
             <button id="btnTrack2" type="button" class="d-none" onclick="activateTrack(2)"></button>
             <button id="btnTrack3" type="button" class="d-none" onclick="activateTrack(3)"></button>
@@ -653,8 +653,43 @@ def index():
           </div>
         </div>
 
-        <!-- Graph Visualization Panel for Track 1 -->
+        <!-- Geographic Map & ReferralGraph Visualization Panel for Track 1 -->
         <div class="col-lg-7 d-flex flex-column gap-3">
+          <!-- Physical Map of New York (NY) — GIS Provider Network -->
+          <div class="card p-3 border shadow-sm" style="background: #ffffff; border-radius: 1.25rem;">
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
+              <div>
+                <h6 id="mapCardTitle" class="card-title mb-0 fw-bold d-flex align-items-center text-dark" style="font-size:0.95rem;">
+                  <i class="fa-solid fa-earth-americas text-primary me-2"></i>Physical Map of New York (NY) — GIS Provider Network
+                  <span class="badge rounded-pill ms-2" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:0.75rem;">Live Referral Overlay</span>
+                </h6>
+                <small class="text-muted" style="font-size:0.75rem;">30 CareNode providers &amp; 89 NY Census tracts (USGS National Map · 100% Public Domain US Gov)</small>
+              </div>
+              <div class="d-flex flex-wrap gap-1">
+                <div class="btn-group btn-group-sm" role="group">
+                  <button type="button" class="btn btn-xs btn-outline-primary active py-1 px-2" id="btnZoomState" onclick="zoomMapRegion('state', this)">🗺️ State</button>
+                  <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2" id="btnZoomBronx" onclick="zoomMapRegion('bronx', this)">🏙️ Bronx</button>
+                  <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2" id="btnZoomCatskills" onclick="zoomMapRegion('catskills', this)">⛰️ Upstate</button>
+                  <button type="button" class="btn btn-xs btn-outline-secondary py-1 px-2" id="btnToggleTracts" onclick="toggleTractLayer(this)">📍 89 Tracts</button>
+                </div>
+              </div>
+            </div>
+            <div id="nyPhysicalMap" style="height: 360px; width: 100%; border-radius: 0.85rem; border: 1px solid #cbd5e1;"></div>
+            <div class="d-flex flex-wrap justify-content-between align-items-center mt-2 small text-muted" style="font-size:0.75rem;">
+              <div>
+                <span class="badge" style="background:#38bdf8; color:#0f172a;">●</span> Clinic (8)
+                <span class="badge ms-1" style="background:#f59e0b; color:#0f172a;">●</span> Coordinator (4)
+                <span class="badge ms-1" style="background:#a855f7; color:#fff;">●</span> Eval Hub (8)
+                <span class="badge ms-1" style="background:#10b981; color:#0f172a;">●</span> Therapy (10)
+                <span class="badge ms-1" style="background:#f43f5e; color:#fff;">○</span> High Zero-Vehicle
+              </div>
+              <div class="font-monospace">
+                <span style="color:#ef4444; font-weight:bold;">━━ Fax Bounce (70d)</span> &nbsp;|&nbsp;
+                <span style="color:#22c55e; font-weight:bold;">━━ &le;45d Route (40d / 22d)</span>
+              </div>
+            </div>
+          </div>
+
           <!-- Graph Viz Card: ReferralGraph Side-by-Side Pathway & 45-Day Statutory Clock -->
           <div class="card p-3 border shadow-sm" style="background: #ffffff; border-radius: 1.25rem;">
             <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
@@ -678,25 +713,6 @@ def index():
               <svg id="svgReferralGraph" viewBox="0 0 760 235" style="width:100%; height:auto; display:block;"></svg>
             </div>
             <div id="svgClockCards" class="row g-2 mb-0"></div>
-          </div>
-
-          <!-- Active Care Pathway Flow Graph (Today's Toddler) -->
-          <div id="triageGraphCard" class="card p-3 border-0 bg-dark text-white" style="background: #0f172a; border-radius: 1.25rem; border: 1px solid #334155; box-shadow: 0 4px 20px rgba(15, 23, 42, 0.25);">
-            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-secondary border-opacity-25">
-              <h6 class="fw-bold mb-0 text-white d-flex align-items-center" style="font-size: 0.88rem;" id="triageGraphTitle">
-                <i class="fa-solid fa-diagram-project text-info me-2"></i> Agent Flow Map — Care Pathway Handoffs
-              </h6>
-              <div class="d-flex align-items-center gap-2">
-                <div class="btn-group btn-group-sm" role="group" aria-label="Graph Language Toggle">
-                  <button type="button" id="btnGraphLangEn" class="btn btn-xs btn-primary active py-0 px-2 fw-bold" style="font-size: 0.7rem;" onclick="setGraphLanguage('en')">EN</button>
-                  <button type="button" id="btnGraphLangEs" class="btn btn-xs btn-outline-secondary py-0 px-2 fw-bold" style="font-size: 0.7rem;" onclick="setGraphLanguage('es')">ES</button>
-                </div>
-                <button type="button" class="btn btn-xs btn-outline-info py-0 px-2" style="font-size: 0.72rem;" onclick="activateTrack(5)" id="btnGraphViewMap">
-                  <i class="fa-solid fa-map-location-dot me-1"></i> View GIS Map
-                </button>
-              </div>
-            </div>
-            <svg id="svgTriagePathway" viewBox="0 0 540 330" class="w-100" style="background: #0f172a; border-radius: 8px;"></svg>
           </div>
         </div>
       </div>
@@ -1090,49 +1106,10 @@ I partner with you to ensure every infant and toddler reaches their developmenta
     </div>
 
     <!-- ========================================== -->
-    <!-- TRACK 5 PANE: NETWORK MAP & AGENT TRACES   -->
+    <!-- TRACK 5 PANE: MULTI-AGENT TRACES & AUDIT   -->
     <!-- ========================================== -->
     <div id="trackPane5" class="track-pane">
-      <!-- Card 1: Physical GIS Map of NY CareNode Provider Network -->
-      <div class="row mb-4">
-        <div class="col-12">
-          <div class="card p-4 border shadow-sm" style="background: #ffffff; border-radius: 1.25rem;">
-            <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
-              <div>
-                <h5 id="mapCardTitle" class="card-title mb-0 fw-bold d-flex align-items-center text-dark">
-                  <i class="fa-solid fa-earth-americas text-primary me-2"></i>Physical Map of New York (NY) — GIS Provider Network
-                  <span class="badge rounded-pill ms-2" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:0.75rem;">Live Referral Overlay</span>
-                </h5>
-                <small class="text-muted" style="font-size:0.75rem;">30 CareNode providers &amp; 89 NY Census tracts (USGS National Map · 100% Public Domain US Gov)</small>
-              </div>
-              <div class="d-flex flex-wrap gap-1">
-                <div class="btn-group btn-group-sm" role="group">
-                  <button type="button" class="btn btn-xs btn-outline-primary active" id="btnZoomState" onclick="zoomMapRegion('state', this)">🗺️ State</button>
-                  <button type="button" class="btn btn-xs btn-outline-primary" id="btnZoomBronx" onclick="zoomMapRegion('bronx', this)">🏙️ Bronx</button>
-                  <button type="button" class="btn btn-xs btn-outline-primary" id="btnZoomCatskills" onclick="zoomMapRegion('catskills', this)">⛰️ Upstate</button>
-                  <button type="button" class="btn btn-xs btn-outline-secondary" id="btnToggleTracts" onclick="toggleTractLayer(this)">📍 89 Tracts</button>
-                </div>
-              </div>
-            </div>
-            <div id="nyPhysicalMap" style="height: 380px; width: 100%; border-radius: 0.85rem; border: 1px solid #cbd5e1;"></div>
-            <div class="d-flex flex-wrap justify-content-between align-items-center mt-2 small text-muted" style="font-size:0.75rem;">
-              <div>
-                <span class="badge" style="background:#38bdf8; color:#0f172a;">●</span> Clinic (8)
-                <span class="badge ms-1" style="background:#f59e0b; color:#0f172a;">●</span> Coordinator (4)
-                <span class="badge ms-1" style="background:#a855f7; color:#fff;">●</span> Eval Hub (8)
-                <span class="badge ms-1" style="background:#10b981; color:#0f172a;">●</span> Therapy (10)
-                <span class="badge ms-1" style="background:#f43f5e; color:#fff;">○</span> High Zero-Vehicle
-              </div>
-              <div class="font-monospace">
-                <span style="color:#ef4444; font-weight:bold;">━━ Fax Bounce (70d)</span> &nbsp;|&nbsp;
-                <span style="color:#22c55e; font-weight:bold;">━━ &le;45d Route (40d / 22d)</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Card 2: Multi-Agent Triage Execution Breakdown -->
+      <!-- Card 1: Multi-Agent Triage Execution Breakdown -->
       <div class="row mb-4">
         <div class="col-12">
           <div class="card p-4 border shadow-sm" style="background: linear-gradient(180deg, #fdfbf7 0%, #ffffff 100%); border-radius: 1.25rem;">
@@ -1530,12 +1507,8 @@ I partner with you to ensure every infant and toddler reaches their developmenta
         const simEl = document.getElementById('simResultsArea');
         if (simEl) simEl.scrollIntoView({ behavior: 'smooth' });
       } else if (trackNum === 5) {
-        if (info) info.innerHTML = "<strong>Network Map &amp; Traces Active:</strong> Geographic GIS overlay of all 30 CareNodes, 89 Census tracts, and BigQuery execution trace audit log.";
-        if (input) input.value = `Inspect geographic coverage and BigQuery multi-agent execution traces for active New York care network.`;
-        if (typeof initPhysicalMap === 'function') initPhysicalMap();
-        if (leafletMap) {
-          setTimeout(() => leafletMap.invalidateSize(), 150);
-        }
+        if (info) info.innerHTML = "<strong>Execution Traces Active:</strong> Multi-agent execution pipeline breakdown and BigQuery streaming execution trace audit log.";
+        if (input) input.value = "Inspect BigQuery multi-agent execution traces for active New York care network.";
         if (typeof loadRecentTraces === 'function') loadRecentTraces();
       }
       if (leafletMap) {
@@ -2326,7 +2299,8 @@ I partner with you to ensure every infant and toddler reaches their developmenta
           // Render the 4-stage handoff SVG graph
           renderPathwayGraph(p);
         } else {
-          document.getElementById('triageGraphCard').style.display = 'none';
+          const graphCard = document.getElementById('triageGraphCard');
+          if (graphCard) graphCard.style.display = 'none';
           resultDiv.innerHTML = `
             ${data.age_warning ? `<div class="alert alert-danger p-2 mb-2">${data.age_warning}</div>` : ''}
             <span class="text-danger fw-bold">No Part C pathway available.</span>

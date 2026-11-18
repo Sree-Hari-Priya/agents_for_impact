@@ -90,9 +90,10 @@ class TestUITheme(unittest.TestCase):
         self.assertIn('setGeoLocation(\'10451\')', html)
         self.assertIn('setGeoLocation(\'10025\')', html)
         self.assertIn('setGeoLocation(\'14094\')', html)
-        self.assertIn('setGeoLocation(\'13617\')', html)
-        self.assertIn('id="triageGraphCard"', html)
-        self.assertIn('id="svgTriagePathway"', html)
+        self.assertIn('id="nyPhysicalMap"', html)
+        self.assertIn('id="svgReferralGraph"', html)
+        self.assertNotIn('id="triageGraphCard"', html)
+        self.assertNotIn('id="svgTriagePathway"', html)
 
 
 if __name__ == "__main__":
