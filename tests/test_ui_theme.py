@@ -28,9 +28,10 @@ class TestUITheme(unittest.TestCase):
         self.assertIn("Saving Children's Milestones", html)
         self.assertIn("IDEA Part C 45-Day Statutory Protection", html)
         self.assertIn("Zero Lost Referrals", html)
-        self.assertIn("Children at Risk of Age-Out", html)
-        self.assertIn("Child-Days Saved by EHR Upgrade", html)
-        self.assertIn("Protected IDEA Part C Route", html)
+        # Verify the requested removal of the KPI bubbles
+        self.assertNotIn("Children at Risk of Age-Out", html)
+        self.assertIn("btnTrack5", html)
+        self.assertIn("trackPane5", html)
 
     def test_typography_and_pills(self):
         html = self.response.text

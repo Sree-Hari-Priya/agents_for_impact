@@ -543,6 +543,9 @@ def index():
             <button id="btnTrack3" type="button" class="btn btn-sm btn-outline-light track-nav-btn" onclick="activateTrack(3)">
               <i class="fa-solid fa-van-shuttle me-1"></i> Track 3: Outreach Season
             </button>
+            <button id="btnTrack5" type="button" class="btn btn-sm btn-outline-light track-nav-btn" onclick="activateTrack(5)">
+              <i class="fa-solid fa-map-location-dot me-1"></i> 🗺️ Network Map &amp; Traces
+            </button>
           </div>
         </div>
         <div id="trackBannerInfo" class="small text-white px-3 py-1 rounded-pill" style="background: rgba(255,255,255,0.2); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.35);">
@@ -553,38 +556,6 @@ def index():
   </div>
 
   <div class="container pb-5">
-    <!-- Top Summary Metrics (Executive Visibility Across All Tracks) -->
-    <div class="row g-3 mb-4">
-      <div class="col-6 col-lg-3">
-        <div class="card p-3 text-center kpi-card kpi-card-breach h-100">
-          <div class="stat-badge text-danger" style="color:#be123c !important;"><i class="fa-solid fa-heart-circle-exclamation me-1" style="font-size:1.15rem; color:#f43f5e;"></i>26 / 35</div>
-          <div class="small fw-bold text-dark mt-1">Children at Risk of Age-Out</div>
-          <div class="text-muted small mt-1" style="font-size:0.75rem;">Breaching 45d Statutory Clock</div>
-        </div>
-      </div>
-      <div class="col-6 col-lg-3">
-        <div class="card p-3 text-center kpi-card kpi-card-bounce h-100">
-          <div class="stat-badge text-warning" style="color:#c2410c !important;"><i class="fa-solid fa-hourglass-half me-1" style="font-size:1.15rem; color:#fb923c;"></i>5 - 6 Days</div>
-          <div class="small fw-bold text-dark mt-1">Deceptive "Bounce Hub" Delay</div>
-          <div class="text-secondary small mt-1" style="font-size:0.75rem;">Conceals downstream fax loops</div>
-        </div>
-      </div>
-      <div class="col-6 col-lg-3">
-        <div class="card p-3 text-center kpi-card kpi-card-saved h-100">
-          <div class="stat-badge text-success" style="color:#15803d !important;"><i class="fa-solid fa-shield-heart me-1" style="font-size:1.15rem; color:#22c55e;"></i>1,168 Days</div>
-          <div class="small fw-bold text-dark mt-1">Child-Days Saved by EHR Upgrade</div>
-          <div class="text-secondary small mt-1" style="font-size:0.75rem;">100% breaches eliminated</div>
-        </div>
-      </div>
-      <div class="col-6 col-lg-3">
-        <div class="card p-3 text-center kpi-card kpi-card-pathway h-100">
-          <div class="stat-badge text-info" style="color:#0369a1 !important;"><i class="fa-solid fa-baby me-1" style="font-size:1.15rem; color:#38bdf8;"></i>17 - 22 Days</div>
-          <div class="small fw-bold text-dark mt-1">Protected IDEA Part C Route</div>
-          <div class="text-secondary small mt-1" style="font-size:0.75rem;">Guaranteed &le;45d for every toddler</div>
-        </div>
-      </div>
-    </div>
-
     <!-- ========================================== -->
     <!-- TRACK 1 PANE: TODAY'S REFERRAL (TRIAGE & CHAT) -->
     <!-- ========================================== -->
@@ -686,45 +657,35 @@ def index():
           </div>
         </div>
 
-        <!-- Geospatial Overlay (Physical Map) ABOVE Agent Flow Map -->
+        <!-- Graph Visualization Panel for Track 1 -->
         <div class="col-lg-7 d-flex flex-column gap-3">
-          <!-- Card 1: Physical Map of NY (ABOVE) -->
+          <!-- Graph Viz Card: ReferralGraph Side-by-Side Pathway & 45-Day Statutory Clock -->
           <div class="card p-3 border shadow-sm" style="background: #ffffff; border-radius: 1.25rem;">
             <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
               <div>
-                <h6 id="mapCardTitle" class="card-title mb-0 fw-bold d-flex align-items-center text-dark">
-                  <i class="fa-solid fa-earth-americas text-primary me-2"></i>Physical Map of New York (NY)
-                  <span class="badge rounded-pill ms-2" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:0.7rem;">Live Referral Overlay</span>
+                <h6 id="graphCardTitle" class="card-title mb-0 fw-bold d-flex align-items-center text-dark" style="font-size:0.95rem;">
+                  <i class="fa-solid fa-clock-rotate-left text-danger me-2"></i>ReferralGraph Side-by-Side Pathway &amp; 45-Day Statutory Clock
                 </h6>
-                <small class="text-muted" style="font-size:0.73rem;">30 CareNode providers &amp; 89 NY Census tracts (USGS National Map · 100% Public Domain US Gov)</small>
+                <small id="graphCardSubtitle" class="text-muted" style="font-size:0.75rem;">
+                  Comparing multi-hop paper-fax bounce loops vs. electronic e-referral routes from the regional coordinator desk.
+                </small>
               </div>
-              <div class="d-flex flex-wrap gap-1">
-                <div class="btn-group btn-group-sm" role="group">
-                  <button type="button" class="btn btn-xs btn-outline-primary active" id="btnZoomState" onclick="zoomMapRegion('state', this)">🗺️ State</button>
-                  <button type="button" class="btn btn-xs btn-outline-primary" id="btnZoomBronx" onclick="zoomMapRegion('bronx', this)">🏙️ Bronx</button>
-                  <button type="button" class="btn btn-xs btn-outline-primary" id="btnZoomCatskills" onclick="zoomMapRegion('catskills', this)">⛰️ Upstate</button>
-                  <button type="button" class="btn btn-xs btn-outline-secondary" id="btnToggleTracts" onclick="toggleTractLayer(this)">📍 89 Tracts</button>
-                </div>
-              </div>
-            </div>
-            <div id="nyPhysicalMap" style="height: 310px; width: 100%; border-radius: 0.75rem; border: 1px solid #cbd5e1;"></div>
-            <div class="d-flex flex-wrap justify-content-between align-items-center mt-2 small text-muted" style="font-size:0.72rem;">
-              <div>
-                <span class="badge" style="background:#38bdf8; color:#0f172a;">●</span> Clinic (8)
-                <span class="badge ms-1" style="background:#f59e0b; color:#0f172a;">●</span> Coordinator (4)
-                <span class="badge ms-1" style="background:#a855f7; color:#fff;">●</span> Eval Hub (8)
-                <span class="badge ms-1" style="background:#10b981; color:#0f172a;">●</span> Therapy (10)
-                <span class="badge ms-1" style="background:#f43f5e; color:#fff;">○</span> High Zero-Vehicle
-              </div>
-              <div class="font-monospace">
-                <span style="color:#ef4444; font-weight:bold;">━━ Fax Bounce (70d)</span> &nbsp;|&nbsp;
-                <span style="color:#22c55e; font-weight:bold;">━━ &le;45d Route (40d / 22d)</span>
+              <div class="btn-group btn-group-sm" role="group">
+                <button id="btn-mode-both" type="button" class="btn btn-xs btn-primary active py-1 px-2 fw-semibold" onclick="setSvgGraphMode('both')">Compare Bounce vs. &le;45d</button>
+                <button id="btn-mode-bounce" type="button" class="btn btn-xs btn-outline-danger py-1 px-2 fw-semibold" onclick="setSvgGraphMode('bounce')">🚨 4-Hop Bounce</button>
+                <button id="btn-mode-eval" type="button" class="btn btn-xs btn-outline-success py-1 px-2 fw-semibold" onclick="setSvgGraphMode('eval')">✅ 3-Hop E-Referral</button>
+                <button id="btn-mode-fast" type="button" class="btn btn-xs btn-outline-info py-1 px-2 fw-semibold" onclick="setSvgGraphMode('fast')">⚡ 2-Hop Fast-Track</button>
               </div>
             </div>
+
+            <div class="p-2 rounded-3 border mb-2" style="background-color: #0f172a; color: #f8fafc; box-shadow: inset 0 2px 6px rgba(0,0,0,0.4);">
+              <svg id="svgReferralGraph" viewBox="0 0 760 235" style="width:100%; height:auto; display:block;"></svg>
+            </div>
+            <div id="svgClockCards" class="row g-2 mb-0"></div>
           </div>
 
-          <!-- Card 2: Agent Flow Map (DIRECTLY UNDER PHYSICAL MAP) -->
-          <div id="triageGraphCard" class="card p-3 border-0 bg-dark text-white" style="display: none; background: #0f172a; border-radius: 1.25rem; border: 1px solid #334155; box-shadow: 0 4px 20px rgba(15, 23, 42, 0.25);">
+          <!-- Active Care Pathway Flow Graph (Today's Toddler) -->
+          <div id="triageGraphCard" class="card p-3 border-0 bg-dark text-white" style="background: #0f172a; border-radius: 1.25rem; border: 1px solid #334155; box-shadow: 0 4px 20px rgba(15, 23, 42, 0.25);">
             <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-secondary border-opacity-25">
               <h6 class="fw-bold mb-0 text-white d-flex align-items-center" style="font-size: 0.88rem;" id="triageGraphTitle">
                 <i class="fa-solid fa-diagram-project text-info me-2"></i> Agent Flow Map — Care Pathway Handoffs
@@ -734,8 +695,8 @@ def index():
                   <button type="button" id="btnGraphLangEn" class="btn btn-xs btn-primary active py-0 px-2 fw-bold" style="font-size: 0.7rem;" onclick="setGraphLanguage('en')">EN</button>
                   <button type="button" id="btnGraphLangEs" class="btn btn-xs btn-outline-secondary py-0 px-2 fw-bold" style="font-size: 0.7rem;" onclick="setGraphLanguage('es')">ES</button>
                 </div>
-                <button type="button" class="btn btn-xs btn-outline-info py-0 px-2" style="font-size: 0.72rem;" onclick="centerMapOnCurrentPathway()" id="btnGraphViewMap">
-                  <i class="fa-solid fa-location-crosshairs me-1"></i> View on Map
+                <button type="button" class="btn btn-xs btn-outline-info py-0 px-2" style="font-size: 0.72rem;" onclick="activateTrack(5)" id="btnGraphViewMap">
+                  <i class="fa-solid fa-map-location-dot me-1"></i> View GIS Map
                 </button>
               </div>
             </div>
@@ -778,190 +739,6 @@ I partner with you to ensure every infant and toddler reaches their developmenta
             </div>
 
             <div class="input-group">
-              <input type="text" id="userInput" class="form-control py-2" placeholder="Ask Maya (e.g. Find a pathway for a 20-month-old in ZIP 10451 on Medicaid)..." onkeydown="if(event.key==='Enter') sendMessage()" style="border-radius: 0.85rem 0 0 0.85rem;">
-              <button class="btn btn-primary px-4 fw-bold" id="btnSendMessage" onclick="sendMessage()" style="border-radius: 0 0.85rem 0.85rem 0;"><i class="fa-solid fa-paper-plane me-1"></i> Send</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ================================================================= -->
-      <!-- MULTI-AGENT TRIAGE WORK BREAKDOWN & BIGQUERY TRACE AUDIT LOG      -->
-      <!-- ================================================================= -->
-      <div class="row mt-4">
-        <div class="col-12">
-          <div class="card p-4 border shadow-sm" style="background: linear-gradient(180deg, #fdfbf7 0%, #ffffff 100%); border-radius: 1.25rem;">
-            <!-- Header -->
-            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom gap-2">
-              <div>
-                <h5 class="card-title mb-1 fw-bold text-dark d-flex align-items-center">
-                  <i class="fa-solid fa-network-wired text-primary me-2"></i>Multi-Agent Triage Execution Breakdown
-                  <span class="badge rounded-pill ms-2" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:0.75rem;">
-                    Google ADK Sequential Pipeline
-                  </span>
-                </h5>
-                <p class="text-muted small mb-0">
-                  Detailed inspection of what each specialized autonomous agent performed during this child's triage, including data inputs, algorithmic decisions, tools invoked, and clock compliance.
-                </p>
-              </div>
-              <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-white text-secondary border p-2 rounded-pill shadow-xs" style="font-size: 0.76rem;">
-                  <i class="fa-solid fa-fingerprint me-1 text-primary"></i>Trace ID: 
-                  <span id="triageTraceIdBadge" class="font-monospace text-dark fw-bold">Live Execution Active</span>
-                </span>
-                <span id="overallTriageBadge" class="badge rounded-pill p-2" style="background:#dcfce7; color:#166534; border:1px solid #bbf7d0; font-size: 0.76rem;">
-                  <i class="fa-solid fa-circle-check me-1"></i>All 4 Agents Completed
-                </span>
-              </div>
-            </div>
-
-            <!-- 4-Agent Pipeline Workflow Cards -->
-            <div class="row g-3 row-cols-1 row-cols-md-2 row-cols-xl-4 mb-4">
-              <!-- Agent 1: Pathway Router -->
-              <div class="col">
-                <div class="card h-100 p-3 bg-white shadow-xs position-relative" style="border: 1px solid #bae6fd !important; border-top: 4px solid #38bdf8 !important; border-radius: 1.15rem;">
-                  <div class="d-flex justify-content-between align-items-start mb-2">
-                    <span class="badge rounded-pill" style="background:#e0f2fe; color:#0284c7; border:1px solid #bae6fd; font-size: 0.72rem; font-weight:700;">Step 1 · Router</span>
-                    <span id="agent1StatusBadge" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" style="font-size: 0.7rem;">COMPLETED</span>
-                  </div>
-                  <h6 class="fw-bold mb-1 text-dark" style="font-size: 0.9rem;">
-                    <i class="fa-solid fa-compass text-primary me-1"></i>Pathway Router Agent
-                  </h6>
-                  <div class="text-secondary small mb-2" style="font-size: 0.72rem;"><code>pathway_router_agent</code></div>
-                  
-                  <div class="mb-2 p-2 rounded small" style="background: #f0f9ff; border: 1px solid #e0f2fe; font-size: 0.74rem;">
-                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-screwdriver-wrench text-secondary me-1"></i>Tools Invoked:</strong>
-                    <div class="text-primary font-monospace" style="font-size: 0.7rem;">• resolve_geographic_location_and_nearest_clinics</div>
-                    <div class="text-primary font-monospace" style="font-size: 0.7rem;">• find_compliant_toddler_pathway</div>
-                  </div>
-
-                  <div class="small mb-2" style="font-size: 0.74rem;">
-                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-list-check text-secondary me-1"></i>What This Agent Did:</strong>
-                    <ul class="ps-3 mb-1 text-muted" id="agent1ActionsList">
-                      <li>Geocoded location to Census Tract GEOID and resolved nearest screening clinics.</li>
-                      <li>Audited 36m Part C statutory age cliff (flagging fast-track if 30+ months).</li>
-                      <li>Traversed BigQuery care graph for optimal ≤45d pathway with Medicaid & Spanish capacity.</li>
-                    </ul>
-                  </div>
-
-                  <div class="mt-auto pt-2 border-top small" style="font-size: 0.72rem;">
-                    <div class="d-flex justify-content-between text-muted">
-                      <span>Latency: <strong id="agent1Latency" class="text-dark">18.2ms</strong></span>
-                      <span id="agent1ResultHop" class="text-success fw-bold">≤ 45d Guaranteed</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Agent 2: Network Bottleneck Auditor -->
-              <div class="col">
-                <div class="card h-100 p-3 bg-white shadow-xs position-relative" style="border: 1px solid #fef08a !important; border-top: 4px solid #fde047 !important; border-radius: 1.15rem;">
-                  <div class="d-flex justify-content-between align-items-start mb-2">
-                    <span class="badge rounded-pill" style="background:#fef9c3; color:#854d0e; border:1px solid #fef08a; font-size: 0.72rem; font-weight:700;">Step 2 · Pre-Audit</span>
-                    <span id="agent2StatusBadge" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" style="font-size: 0.7rem;">COMPLETED</span>
-                  </div>
-                  <h6 class="fw-bold mb-1 text-dark" style="font-size: 0.9rem;">
-                    <i class="fa-solid fa-shield-halved text-warning me-1"></i>Network Audit Agent
-                  </h6>
-                  <div class="text-secondary small mb-2" style="font-size: 0.72rem;"><code>network_audit_agent</code></div>
-                  
-                  <div class="mb-2 p-2 rounded small" style="background: #fefce8; border: 1px solid #fef9c3; font-size: 0.74rem;">
-                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-screwdriver-wrench text-secondary me-1"></i>Tools Invoked:</strong>
-                    <div class="text-warning-emphasis font-monospace" style="font-size: 0.7rem;">• trace_45day_breaches_and_bounce_hubs</div>
-                    <div class="text-warning-emphasis font-monospace" style="font-size: 0.7rem;">• validate_pre_handoff_packet</div>
-                  </div>
-
-                  <div class="small mb-2" style="font-size: 0.74rem;">
-                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-list-check text-secondary me-1"></i>What This Agent Did:</strong>
-                    <ul class="ps-3 mb-1 text-muted" id="agent2ActionsList">
-                      <li>Audited Hop-2 coordinator channels to bypass deceptive 5-day paper-fax bounce hubs.</li>
-                      <li>Validated pre-handoff packet completeness (parental consent + ASQ-3 screening).</li>
-                      <li>Locked pathway to direct electronic EHR intake desk (eliminating 38d loop).</li>
-                    </ul>
-                  </div>
-
-                  <div class="mt-auto pt-2 border-top small" style="font-size: 0.72rem;">
-                    <div class="d-flex justify-content-between text-muted">
-                      <span>Latency: <strong id="agent2Latency" class="text-dark">9.4ms</strong></span>
-                      <span id="agent2PacketStatus" class="text-success fw-bold">Packet Validated</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Agent 3: Equity Auditor -->
-              <div class="col">
-                <div class="card h-100 p-3 bg-white shadow-xs position-relative" style="border: 1px solid #bbf7d0 !important; border-top: 4px solid #86efac !important; border-radius: 1.15rem;">
-                  <div class="d-flex justify-content-between align-items-start mb-2">
-                    <span class="badge rounded-pill" style="background:#dcfce7; color:#166534; border:1px solid #bbf7d0; font-size: 0.72rem; font-weight:700;">Step 3 · Demographics</span>
-                    <span id="agent3StatusBadge" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" style="font-size: 0.7rem;">COMPLETED</span>
-                  </div>
-                  <h6 class="fw-bold mb-1 text-dark" style="font-size: 0.9rem;">
-                    <i class="fa-solid fa-scale-balanced text-success me-1"></i>Equity Audit Agent
-                  </h6>
-                  <div class="text-secondary small mb-2" style="font-size: 0.72rem;"><code>equity_audit_agent</code></div>
-                  
-                  <div class="mb-2 p-2 rounded small" style="background: #f0fdf4; border: 1px solid #dcfce7; font-size: 0.74rem;">
-                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-screwdriver-wrench text-secondary me-1"></i>Tools Invoked:</strong>
-                    <div class="text-success font-monospace" style="font-size: 0.7rem;">• run_equity_and_counterfactual_audit</div>
-                  </div>
-
-                  <div class="small mb-2" style="font-size: 0.74rem;">
-                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-list-check text-secondary me-1"></i>What This Agent Did:</strong>
-                    <ul class="ps-3 mb-1 text-muted" id="agent3ActionsList">
-                      <li>Audited Census tract under-5 poverty and zero-vehicle household demographics.</li>
-                      <li>Assessed transit burden; deployed transportation assistance guardrail if zero-vehicle >15%.</li>
-                      <li>Calculated counterfactual days saved (+23d to +38d) vs legacy paper fax.</li>
-                    </ul>
-                  </div>
-
-                  <div class="mt-auto pt-2 border-top small" style="font-size: 0.72rem;">
-                    <div class="d-flex justify-content-between text-muted">
-                      <span>Latency: <strong id="agent3Latency" class="text-dark">6.1ms</strong></span>
-                      <span id="agent3TransitStatus" class="text-success fw-bold">Guardrail Active</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Agent 4: Caregiver Note Agent -->
-              <div class="col">
-                <div class="card h-100 p-3 bg-white shadow-xs position-relative" style="border: 1px solid #e9d5ff !important; border-top: 4px solid #d8b4fe !important; border-radius: 1.15rem;">
-                  <div class="d-flex justify-content-between align-items-start mb-2">
-                    <span class="badge rounded-pill" style="background:#f3e8ff; color:#7c3aed; border:1px solid #e9d5ff; font-size: 0.72rem; font-weight:700;">Step 4 · Caregiver</span>
-                    <span id="agent4StatusBadge" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" style="font-size: 0.7rem;">COMPLETED</span>
-                  </div>
-                  <h6 class="fw-bold mb-1 text-dark" style="font-size: 0.9rem;">
-                    <i class="fa-solid fa-language me-1" style="color:#7c3aed;"></i>Caregiver Note Agent
-                  </h6>
-                  <div class="text-secondary small mb-2" style="font-size: 0.72rem;"><code>caregiver_note_agent</code></div>
-                  
-                  <div class="mb-2 p-2 rounded small" style="background: #faf5ff; border: 1px solid #f3e8ff; font-size: 0.74rem;">
-                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-screwdriver-wrench text-secondary me-1"></i>Tools Invoked:</strong>
-                    <div class="font-monospace" style="color:#7c3aed; font-size: 0.7rem;">• format_bilingual_caregiver_note</div>
-                  </div>
-
-                  <div class="small mb-2" style="font-size: 0.74rem;">
-                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-list-check text-secondary me-1"></i>What This Agent Did:</strong>
-                    <ul class="ps-3 mb-1 text-muted" id="agent4ActionsList">
-                      <li>Synthesized clinical handoff data into plain-language, jargon-free parent action steps.</li>
-                      <li>Drafted synchronized dual-language English and Spanish letters with coordinator direct lines.</li>
-                      <li>Incorporated 34 CFR § 303.310 statutory 45-day evaluation guarantee rights.</li>
-                    </ul>
-                  </div>
-
-                  <div class="mt-auto pt-2 border-top small" style="font-size: 0.72rem;">
-                    <div class="d-flex justify-content-between text-muted">
-                      <span>Latency: <strong id="agent4Latency" class="text-dark">4.9ms</strong></span>
-                      <span id="agent4NoteStatus" class="fw-bold" style="color:#7c3aed;">Bilingual Ready</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- ========================================== -->
@@ -1107,29 +884,56 @@ I partner with you to ensure every infant and toddler reaches their developmenta
     <!-- TRACK 2 PANE: THIS QUARTER'S AUDIT -->
     <!-- ========================================== -->
     <div id="trackPane2" class="track-pane">
-      <!-- ReferralGraph Side-by-Side SVG Clock -->
+      <!-- Track 2 Header Banner & Diagnosis -->
       <div class="row mb-4">
         <div class="col-12">
-          <div class="card p-4">
-            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+          <div class="card p-4 border shadow-sm" style="background: linear-gradient(180deg, #fdfbf7 0%, #ffffff 100%); border-radius: 1.25rem;">
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
               <div>
-                <h5 id="graphCardTitle" class="card-title mb-1 fw-bold"><i class="fa-solid fa-clock-rotate-left text-danger me-2"></i>ReferralGraph Side-by-Side Pathway &amp; 45-Day Statutory Clock</h5>
-                <p id="graphCardSubtitle" class="text-muted small mb-0">
-                  Comparing multi-hop paper-fax bounce loops vs. electronic e-referral routes from the same regional coordinator desk.
+                <h5 class="card-title mb-1 fw-bold text-dark d-flex align-items-center">
+                  <i class="fa-solid fa-network-wired text-primary me-2"></i>Quarterly Systemic Audit: Variable-Length GQL Analysis
+                  <span class="badge rounded-pill ms-2" style="background:#fee2e2; color:#991b1b; border:1px solid #fecaca; font-size:0.75rem;">
+                    ISO GQL: -[:TRANSFERS_TO*2..4]-&gt;
+                  </span>
+                </h5>
+                <p class="text-muted small mb-0">
+                  Exposing how flat waitlists at regional coordinator desks conceal downstream paper-fax loops that breach the federal 45-day Part C evaluation clock.
                 </p>
               </div>
-              <div class="btn-group btn-group-sm" role="group">
-                <button id="btn-mode-both" type="button" class="btn btn-primary active" onclick="setSvgGraphMode('both')">Compare Bounce vs. &le;45d Route</button>
-                <button id="btn-mode-bounce" type="button" class="btn btn-outline-danger" onclick="setSvgGraphMode('bounce')">🚨 4-Hop Fax Bounce</button>
-                <button id="btn-mode-eval" type="button" class="btn btn-outline-success" onclick="setSvgGraphMode('eval')">✅ 3-Hop E-Referral</button>
-                <button id="btn-mode-fast" type="button" class="btn btn-outline-info" onclick="setSvgGraphMode('fast')">⚡ 2-Hop Fast-Track</button>
+              <button class="btn btn-outline-primary btn-sm rounded-pill fw-semibold" onclick="activateTrack(1)">
+                <i class="fa-solid fa-clock-rotate-left me-1"></i> View Interactive Clock Graph in Navigator &rarr;
+              </button>
+            </div>
+            <div class="row g-3 mt-1">
+              <div class="col-md-3">
+                <div class="p-3 bg-white border rounded-3 text-center">
+                  <div class="stat-badge text-danger" style="font-size:1.3rem; font-weight:800; color:#e11d48 !important;">26 of 35</div>
+                  <div class="small fw-bold text-dark">Chains Breaching &le;45d</div>
+                  <div class="text-muted" style="font-size:0.72rem;">Statewide statutory violations</div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="p-3 bg-white border rounded-3 text-center">
+                  <div class="stat-badge text-warning" style="font-size:1.3rem; font-weight:800; color:#d97706 !important;">5–6 Days</div>
+                  <div class="small fw-bold text-dark">Deceptive Desk Wait</div>
+                  <div class="text-muted" style="font-size:0.72rem;">Reported waitlist conceals bounce</div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="p-3 bg-white border rounded-3 text-center">
+                  <div class="stat-badge text-danger" style="font-size:1.3rem; font-weight:800; color:#b91c1c !important;">70.0 Days</div>
+                  <div class="small fw-bold text-dark">Avg 4-Hop Fax Chain</div>
+                  <div class="text-muted" style="font-size:0.72rem;">+25 days over legal limit</div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="p-3 bg-white border rounded-3 text-center">
+                  <div class="stat-badge text-success" style="font-size:1.3rem; font-weight:800; color:#15803d !important;">1,168 Days</div>
+                  <div class="small fw-bold text-dark">Delay Days Saved</div>
+                  <div class="text-muted" style="font-size:0.72rem;">Via electronic triage routing</div>
+                </div>
               </div>
             </div>
-
-            <div class="p-3 rounded-3 border mb-3" style="background-color: #0f172a; color: #f8fafc; box-shadow: inset 0 2px 6px rgba(0,0,0,0.4);">
-              <svg id="svgReferralGraph" viewBox="0 0 760 235" style="width:100%; height:auto; display:block;"></svg>
-            </div>
-            <div id="svgClockCards" class="row g-3 mb-0"></div>
           </div>
         </div>
       </div>
@@ -1280,6 +1084,268 @@ I partner with you to ensure every infant and toddler reaches their developmenta
             </div>
           </div>
         </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TRACK 5 PANE: NETWORK MAP & AGENT TRACES   -->
+    <!-- ========================================== -->
+    <div id="trackPane5" class="track-pane">
+      <!-- Card 1: Physical GIS Map of NY CareNode Provider Network -->
+      <div class="row mb-4">
+        <div class="col-12">
+          <div class="card p-4 border shadow-sm" style="background: #ffffff; border-radius: 1.25rem;">
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
+              <div>
+                <h5 id="mapCardTitle" class="card-title mb-0 fw-bold d-flex align-items-center text-dark">
+                  <i class="fa-solid fa-earth-americas text-primary me-2"></i>Physical Map of New York (NY) — GIS Provider Network
+                  <span class="badge rounded-pill ms-2" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:0.75rem;">Live Referral Overlay</span>
+                </h5>
+                <small class="text-muted" style="font-size:0.75rem;">30 CareNode providers &amp; 89 NY Census tracts (USGS National Map · 100% Public Domain US Gov)</small>
+              </div>
+              <div class="d-flex flex-wrap gap-1">
+                <div class="btn-group btn-group-sm" role="group">
+                  <button type="button" class="btn btn-xs btn-outline-primary active" id="btnZoomState" onclick="zoomMapRegion('state', this)">🗺️ State</button>
+                  <button type="button" class="btn btn-xs btn-outline-primary" id="btnZoomBronx" onclick="zoomMapRegion('bronx', this)">🏙️ Bronx</button>
+                  <button type="button" class="btn btn-xs btn-outline-primary" id="btnZoomCatskills" onclick="zoomMapRegion('catskills', this)">⛰️ Upstate</button>
+                  <button type="button" class="btn btn-xs btn-outline-secondary" id="btnToggleTracts" onclick="toggleTractLayer(this)">📍 89 Tracts</button>
+                </div>
+              </div>
+            </div>
+            <div id="nyPhysicalMap" style="height: 380px; width: 100%; border-radius: 0.85rem; border: 1px solid #cbd5e1;"></div>
+            <div class="d-flex flex-wrap justify-content-between align-items-center mt-2 small text-muted" style="font-size:0.75rem;">
+              <div>
+                <span class="badge" style="background:#38bdf8; color:#0f172a;">●</span> Clinic (8)
+                <span class="badge ms-1" style="background:#f59e0b; color:#0f172a;">●</span> Coordinator (4)
+                <span class="badge ms-1" style="background:#a855f7; color:#fff;">●</span> Eval Hub (8)
+                <span class="badge ms-1" style="background:#10b981; color:#0f172a;">●</span> Therapy (10)
+                <span class="badge ms-1" style="background:#f43f5e; color:#fff;">○</span> High Zero-Vehicle
+              </div>
+              <div class="font-monospace">
+                <span style="color:#ef4444; font-weight:bold;">━━ Fax Bounce (70d)</span> &nbsp;|&nbsp;
+                <span style="color:#22c55e; font-weight:bold;">━━ &le;45d Route (40d / 22d)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Multi-Agent Triage Execution Breakdown -->
+      <div class="row mb-4">
+        <div class="col-12">
+          <div class="card p-4 border shadow-sm" style="background: linear-gradient(180deg, #fdfbf7 0%, #ffffff 100%); border-radius: 1.25rem;">
+            <!-- Header -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom gap-2">
+              <div>
+                <h5 class="card-title mb-1 fw-bold text-dark d-flex align-items-center">
+                  <i class="fa-solid fa-network-wired text-primary me-2"></i>Multi-Agent Triage Execution Breakdown
+                  <span class="badge rounded-pill ms-2" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:0.75rem;">
+                    Google ADK Sequential Pipeline
+                  </span>
+                </h5>
+                <p class="text-muted small mb-0">
+                  Detailed inspection of what each specialized autonomous agent performed during this child's triage, including data inputs, algorithmic decisions, tools invoked, and clock compliance.
+                </p>
+              </div>
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-white text-secondary border p-2 rounded-pill shadow-xs" style="font-size: 0.76rem;">
+                  <i class="fa-solid fa-fingerprint me-1 text-primary"></i>Trace ID: 
+                  <span id="triageTraceIdBadge" class="font-monospace text-dark fw-bold">Live Execution Active</span>
+                </span>
+                <span id="overallTriageBadge" class="badge rounded-pill p-2" style="background:#dcfce7; color:#166534; border:1px solid #bbf7d0; font-size: 0.76rem;">
+                  <i class="fa-solid fa-circle-check me-1"></i>All 4 Agents Completed
+                </span>
+              </div>
+            </div>
+
+            <!-- 4-Agent Pipeline Workflow Cards -->
+            <div class="row g-3 row-cols-1 row-cols-md-2 row-cols-xl-4 mb-2">
+              <!-- Agent 1: Pathway Router -->
+              <div class="col">
+                <div class="card h-100 p-3 bg-white shadow-xs position-relative" style="border: 1px solid #bae6fd !important; border-top: 4px solid #38bdf8 !important; border-radius: 1.15rem;">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="badge rounded-pill" style="background:#e0f2fe; color:#0284c7; border:1px solid #bae6fd; font-size: 0.72rem; font-weight:700;">Step 1 · Router</span>
+                    <span id="agent1StatusBadge" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" style="font-size: 0.7rem;">COMPLETED</span>
+                  </div>
+                  <h6 class="fw-bold mb-1 text-dark" style="font-size: 0.9rem;">
+                    <i class="fa-solid fa-compass text-primary me-1"></i>Pathway Router Agent
+                  </h6>
+                  <div class="text-secondary small mb-2" style="font-size: 0.72rem;"><code>pathway_router_agent</code></div>
+                  
+                  <div class="mb-2 p-2 rounded small" style="background: #f0f9ff; border: 1px solid #e0f2fe; font-size: 0.74rem;">
+                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-screwdriver-wrench text-secondary me-1"></i>Tools Invoked:</strong>
+                    <div class="text-primary font-monospace" style="font-size: 0.7rem;">• resolve_geographic_location_and_nearest_clinics</div>
+                    <div class="text-primary font-monospace" style="font-size: 0.7rem;">• find_compliant_toddler_pathway</div>
+                  </div>
+
+                  <div class="small mb-2" style="font-size: 0.74rem;">
+                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-list-check text-secondary me-1"></i>What This Agent Did:</strong>
+                    <ul class="ps-3 mb-1 text-muted" id="agent1ActionsList">
+                      <li>Geocoded location to Census Tract GEOID and resolved nearest screening clinics.</li>
+                      <li>Audited 36m Part C statutory age cliff (flagging fast-track if 30+ months).</li>
+                      <li>Traversed BigQuery care graph for optimal ≤45d pathway with Medicaid & Spanish capacity.</li>
+                    </ul>
+                  </div>
+
+                  <div class="mt-auto pt-2 border-top small" style="font-size: 0.72rem;">
+                    <div class="d-flex justify-content-between text-muted">
+                      <span>Latency: <strong id="agent1Latency" class="text-dark">18.2ms</strong></span>
+                      <span id="agent1ResultHop" class="text-success fw-bold">≤ 45d Guaranteed</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Agent 2: Network Bottleneck Auditor -->
+              <div class="col">
+                <div class="card h-100 p-3 bg-white shadow-xs position-relative" style="border: 1px solid #fef08a !important; border-top: 4px solid #fde047 !important; border-radius: 1.15rem;">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="badge rounded-pill" style="background:#fef9c3; color:#854d0e; border:1px solid #fef08a; font-size: 0.72rem; font-weight:700;">Step 2 · Pre-Audit</span>
+                    <span id="agent2StatusBadge" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" style="font-size: 0.7rem;">COMPLETED</span>
+                  </div>
+                  <h6 class="fw-bold mb-1 text-dark" style="font-size: 0.9rem;">
+                    <i class="fa-solid fa-shield-halved text-warning me-1"></i>Network Audit Agent
+                  </h6>
+                  <div class="text-secondary small mb-2" style="font-size: 0.72rem;"><code>network_audit_agent</code></div>
+                  
+                  <div class="mb-2 p-2 rounded small" style="background: #fefce8; border: 1px solid #fef9c3; font-size: 0.74rem;">
+                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-screwdriver-wrench text-secondary me-1"></i>Tools Invoked:</strong>
+                    <div class="text-warning-emphasis font-monospace" style="font-size: 0.7rem;">• trace_45day_breaches_and_bounce_hubs</div>
+                    <div class="text-warning-emphasis font-monospace" style="font-size: 0.7rem;">• validate_pre_handoff_packet</div>
+                  </div>
+
+                  <div class="small mb-2" style="font-size: 0.74rem;">
+                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-list-check text-secondary me-1"></i>What This Agent Did:</strong>
+                    <ul class="ps-3 mb-1 text-muted" id="agent2ActionsList">
+                      <li>Audited Hop-2 coordinator channels to bypass deceptive 5-day paper-fax bounce hubs.</li>
+                      <li>Validated pre-handoff packet completeness (parental consent + ASQ-3 screening).</li>
+                      <li>Locked pathway to direct electronic EHR intake desk (eliminating 38d loop).</li>
+                    </ul>
+                  </div>
+
+                  <div class="mt-auto pt-2 border-top small" style="font-size: 0.72rem;">
+                    <div class="d-flex justify-content-between text-muted">
+                      <span>Latency: <strong id="agent2Latency" class="text-dark">9.4ms</strong></span>
+                      <span id="agent2PacketStatus" class="text-success fw-bold">Packet Validated</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Agent 3: Equity Auditor -->
+              <div class="col">
+                <div class="card h-100 p-3 bg-white shadow-xs position-relative" style="border: 1px solid #bbf7d0 !important; border-top: 4px solid #86efac !important; border-radius: 1.15rem;">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="badge rounded-pill" style="background:#dcfce7; color:#166534; border:1px solid #bbf7d0; font-size: 0.72rem; font-weight:700;">Step 3 · Demographics</span>
+                    <span id="agent3StatusBadge" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" style="font-size: 0.7rem;">COMPLETED</span>
+                  </div>
+                  <h6 class="fw-bold mb-1 text-dark" style="font-size: 0.9rem;">
+                    <i class="fa-solid fa-scale-balanced text-success me-1"></i>Equity Audit Agent
+                  </h6>
+                  <div class="text-secondary small mb-2" style="font-size: 0.72rem;"><code>equity_audit_agent</code></div>
+                  
+                  <div class="mb-2 p-2 rounded small" style="background: #f0fdf4; border: 1px solid #dcfce7; font-size: 0.74rem;">
+                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-screwdriver-wrench text-secondary me-1"></i>Tools Invoked:</strong>
+                    <div class="text-success font-monospace" style="font-size: 0.7rem;">• run_equity_and_counterfactual_audit</div>
+                  </div>
+
+                  <div class="small mb-2" style="font-size: 0.74rem;">
+                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-list-check text-secondary me-1"></i>What This Agent Did:</strong>
+                    <ul class="ps-3 mb-1 text-muted" id="agent3ActionsList">
+                      <li>Audited Census tract under-5 poverty and zero-vehicle household demographics.</li>
+                      <li>Assessed transit burden; deployed transportation assistance guardrail if zero-vehicle >15%.</li>
+                      <li>Calculated counterfactual days saved (+23d to +38d) vs legacy paper fax.</li>
+                    </ul>
+                  </div>
+
+                  <div class="mt-auto pt-2 border-top small" style="font-size: 0.72rem;">
+                    <div class="d-flex justify-content-between text-muted">
+                      <span>Latency: <strong id="agent3Latency" class="text-dark">6.1ms</strong></span>
+                      <span id="agent3TransitStatus" class="text-success fw-bold">Guardrail Active</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Agent 4: Caregiver Note Agent -->
+              <div class="col">
+                <div class="card h-100 p-3 bg-white shadow-xs position-relative" style="border: 1px solid #e9d5ff !important; border-top: 4px solid #d8b4fe !important; border-radius: 1.15rem;">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="badge rounded-pill" style="background:#f3e8ff; color:#7c3aed; border:1px solid #e9d5ff; font-size: 0.72rem; font-weight:700;">Step 4 · Caregiver</span>
+                    <span id="agent4StatusBadge" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" style="font-size: 0.7rem;">COMPLETED</span>
+                  </div>
+                  <h6 class="fw-bold mb-1 text-dark" style="font-size: 0.9rem;">
+                    <i class="fa-solid fa-language me-1" style="color:#7c3aed;"></i>Caregiver Note Agent
+                  </h6>
+                  <div class="text-secondary small mb-2" style="font-size: 0.72rem;"><code>caregiver_note_agent</code></div>
+                  
+                  <div class="mb-2 p-2 rounded small" style="background: #faf5ff; border: 1px solid #f3e8ff; font-size: 0.74rem;">
+                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-screwdriver-wrench text-secondary me-1"></i>Tools Invoked:</strong>
+                    <div class="font-monospace" style="color:#7c3aed; font-size: 0.7rem;">• format_bilingual_caregiver_note</div>
+                  </div>
+
+                  <div class="small mb-2" style="font-size: 0.74rem;">
+                    <strong class="text-dark d-block mb-1"><i class="fa-solid fa-list-check text-secondary me-1"></i>What This Agent Did:</strong>
+                    <ul class="ps-3 mb-1 text-muted" id="agent4ActionsList">
+                      <li>Synthesized clinical handoff data into plain-language, jargon-free parent action steps.</li>
+                      <li>Drafted synchronized dual-language English and Spanish letters with coordinator direct lines.</li>
+                      <li>Incorporated 34 CFR § 303.310 statutory 45-day evaluation guarantee rights.</li>
+                    </ul>
+                  </div>
+
+                  <div class="mt-auto pt-2 border-top small" style="font-size: 0.72rem;">
+                    <div class="d-flex justify-content-between text-muted">
+                      <span>Latency: <strong id="agent4Latency" class="text-dark">4.9ms</strong></span>
+                      <span id="agent4NoteStatus" class="fw-bold" style="color:#7c3aed;">Bilingual Ready</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: BigQuery Trace Telemetry Audit Log Table -->
+      <div class="row">
+        <div class="col-12">
+          <div class="card p-4 border shadow-sm" style="background: #ffffff; border-radius: 1.25rem;">
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+              <div>
+                <h5 class="card-title mb-1 fw-bold text-dark d-flex align-items-center">
+                  <i class="fa-solid fa-database text-primary me-2"></i>BigQuery Trace Audit Log
+                  <span class="badge rounded-pill ms-2" style="background:#fef9c3; color:#713f12; border:1px solid #fef08a; font-size:0.72rem;">
+                    Telemetry Stream (a4i_early_intervention.triage_agent_execution_traces)
+                  </span>
+                </h5>
+                <p class="text-muted small mb-0">
+                  Live streaming execution trace events captured across all 4 autonomous sub-agents during triage queries.
+                </p>
+              </div>
+              <button class="btn btn-outline-primary btn-sm rounded-pill fw-semibold" onclick="loadRecentTraces()">
+                <i class="fa-solid fa-rotate me-1"></i> Refresh Traces
+              </button>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0 table-custom">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Trace ID</th>
+                    <th>Agent Name</th>
+                    <th>Event Type</th>
+                    <th>Status</th>
+                    <th class="text-end">Latency</th>
+                  </tr>
+                </thead>
+                <tbody id="bqTracesTableBody">
+                  <tr>
+                    <td colspan="6" class="text-center text-muted py-3">Click Refresh Traces to inspect live BigQuery execution logs.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1420,7 +1486,7 @@ I partner with you to ensure every infant and toddler reaches their developmenta
 
     function activateTrack(trackNum) {
       // Toggle button active states
-      for (let i = 1; i <= 4; i++) {
+      for (let i = 1; i <= 5; i++) {
         const btn = document.getElementById('btnTrack' + i);
         const pane = document.getElementById('trackPane' + i);
         if (btn) {
@@ -1444,8 +1510,6 @@ I partner with you to ensure every infant and toddler reaches their developmenta
       } else if (trackNum === 2) {
         info.innerHTML = "<strong>Track 2 Active:</strong> Variable-length GQL exposes systemic paper-fax bounce hubs breaking federal clock.";
         input.value = `Trace 3-to-4 hop referral chains breaching 45 days in ${activeState} and identify the regional bounce hubs.`;
-        setSvgGraphMode('both');
-        renderSvgComparisonGraph();
       } else if (trackNum === 3) {
         info.innerHTML = "<strong>Track 3 Active:</strong> Combine ACS under-5 poverty & NSCH screening baselines to deploy mobile screening days.";
         input.value = `Where should community developmental screening outreach days go first in ${cfg.name}?`;
@@ -1455,14 +1519,55 @@ I partner with you to ensure every infant and toddler reaches their developmenta
         input.value = "Simulate network fix: how many breached cases drop under 45 days if Walton Regional Desk (SYN-PROV-NY-011) switches to electronic intake with pre-checked bilingual slots?";
         const simEl = document.getElementById('simResultsArea');
         if (simEl) simEl.scrollIntoView({ behavior: 'smooth' });
+      } else if (trackNum === 5) {
+        info.innerHTML = "<strong>Network Map &amp; Traces Active:</strong> Geographic GIS overlay of all 30 CareNodes, 89 Census tracts, and BigQuery execution trace audit log.";
+        input.value = `Inspect geographic coverage and BigQuery multi-agent execution traces for active New York care network.`;
+        if (typeof initPhysicalMap === 'function') initPhysicalMap();
+        if (leafletMap) {
+          setTimeout(() => leafletMap.invalidateSize(), 150);
+        }
+        if (typeof loadRecentTraces === 'function') loadRecentTraces();
       }
       if (leafletMap) {
         setTimeout(() => leafletMap.invalidateSize(), 150);
       }
     }
 
+    async function loadRecentTraces() {
+      const tbody = document.getElementById('bqTracesTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3"><i class="fa-solid fa-spinner fa-spin me-1"></i> Streaming BigQuery execution traces...</td></tr>';
+      try {
+        const res = await fetch('/api/traces/recent?limit=15');
+        const data = await res.json();
+        if (data.traces && data.traces.length > 0) {
+          tbody.innerHTML = data.traces.map(t => {
+            const isBreach = t.status === 'BREACH' || t.status === 'ERROR';
+            const isSuccess = t.status === 'SUCCESS' || t.status === 'OK' || t.status === 'COMPLIANT';
+            const badgeClass = isBreach ? 'badge bg-danger' : (isSuccess ? 'badge bg-success' : 'badge bg-info');
+            const shortTrace = t.trace_id ? (t.trace_id.length > 12 ? t.trace_id.substring(0, 12) + '...' : t.trace_id) : 'N/A';
+            const timeStr = t.timestamp ? t.timestamp.substring(11, 19) : '--:--:--';
+            return `<tr>
+              <td class="font-monospace small">${timeStr}</td>
+              <td><span class="font-monospace small text-primary fw-bold">${shortTrace}</span></td>
+              <td><span class="badge rounded-pill" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; font-size:0.72rem;">${t.agent_name || 'agent'}</span></td>
+              <td class="small">${t.event_type || 'triage_event'}</td>
+              <td><span class="${badgeClass}">${t.status || 'OK'}</span></td>
+              <td class="font-monospace small text-end">${t.latency_ms ? t.latency_ms + 'ms' : '<10ms'}</td>
+            </tr>`;
+          }).join('');
+        } else {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No traces recorded yet. Calculate a pathway or query Maya to generate execution traces.</td></tr>';
+        }
+      } catch (err) {
+        console.error('Failed to load traces', err);
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-3"><i class="fa-solid fa-triangle-exclamation me-1"></i> Failed to connect to BigQuery telemetry stream.</td></tr>';
+      }
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
       setActiveState('NY');
+      renderSvgComparisonGraph();
       // Initialize Track 1 location resolution and triage route
       resolveLocationNow();
     });
@@ -2123,22 +2228,25 @@ I partner with you to ensure every infant and toddler reaches their developmenta
     }
 
     function centerMapOnCurrentPathway() {
-      const m = leafletMap || window.leafletMap;
-      if (m) {
-        const mapEl = document.getElementById('nyPhysicalMap');
-        if (mapEl) {
-          mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      activateTrack(5);
+      setTimeout(() => {
+        const m = leafletMap || window.leafletMap;
+        if (m) {
+          const mapEl = document.getElementById('nyPhysicalMap');
+          if (mapEl) {
+            mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          const geoid = document.getElementById('tractGeoid') ? document.getElementById('tractGeoid').value.trim() : '';
+          if (geoid.startsWith('36005')) {
+            zoomMapRegion('bronx');
+          } else if (geoid.startsWith('36089') || geoid.startsWith('36063')) {
+            zoomMapRegion('catskills');
+          } else {
+            zoomMapRegion('state');
+          }
+          m.invalidateSize();
         }
-        const geoid = document.getElementById('tractGeoid') ? document.getElementById('tractGeoid').value.trim() : '';
-        if (geoid.startsWith('36005')) {
-          zoomMapRegion('bronx');
-        } else if (geoid.startsWith('36089') || geoid.startsWith('36063')) {
-          zoomMapRegion('catskills');
-        } else {
-          zoomMapRegion('state');
-        }
-        setTimeout(() => m.invalidateSize(), 150);
-      }
+      }, 100);
     }
 
     let currentTriageRequestId = 0;
