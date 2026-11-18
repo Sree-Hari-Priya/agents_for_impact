@@ -25,6 +25,7 @@ class TestUITheme(unittest.TestCase):
 
     def test_child_saving_thematic_elements(self):
         html = self.response.text
+        self.assertIn("EarlyBridge: Triage &amp; Network-Audit", html)
         self.assertIn("Saving Children's Milestones", html)
         self.assertIn("IDEA Part C 45-Day Statutory Protection", html)
         self.assertIn("Zero Lost Referrals", html)
@@ -32,6 +33,11 @@ class TestUITheme(unittest.TestCase):
         self.assertNotIn("Children at Risk of Age-Out", html)
         self.assertIn("btnTrack5", html)
         self.assertIn("trackPane5", html)
+        self.assertIn('id="trackPane4"', html)
+        self.assertIn('id="simResultsArea"', html)
+        # Verify Track 2 and 3 are hidden from navigation visibility
+        self.assertIn('id="btnTrack2" type="button" class="d-none"', html)
+        self.assertIn('id="btnTrack3" type="button" class="d-none"', html)
 
     def test_typography_and_pills(self):
         html = self.response.text

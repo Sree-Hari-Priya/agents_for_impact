@@ -209,7 +209,7 @@ def index():
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>First Milestones - Early Intervention Triage & Network Audit</title>
+  <title>EarlyBridge - Early Intervention Triage & Network Audit</title>
   <!-- Google Fonts: Quicksand & Nunito (Warm Child-Saving Typography) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -514,7 +514,7 @@ def index():
               <span class="badge rounded-pill px-3 py-1 fw-bold shadow-xs" style="background:rgba(255,255,255,0.25); color:#ffffff; border: 1px solid rgba(255,255,255,0.45); backdrop-filter: blur(4px);"><i class="fa-solid fa-shield-heart me-1 text-danger"></i>IDEA Part C 45-Day Statutory Protection</span>
               <span class="badge rounded-pill px-3 py-1 fw-bold shadow-xs" style="background:#dcfce7; color:#14532d; border: 1px solid #bbf7d0;"><i class="fa-solid fa-baby me-1 text-success"></i>Zero Lost Referrals</span>
             </div>
-            <h1 class="h2 mb-1 fw-bold text-white" style="letter-spacing:-0.5px; text-shadow: 0 2px 8px rgba(0,0,0,0.15);">First Milestones: Triage &amp; Network-Audit</h1>
+            <h1 class="h2 mb-1 fw-bold text-white" style="letter-spacing:-0.5px; text-shadow: 0 2px 8px rgba(0,0,0,0.15);">EarlyBridge: Triage &amp; Network-Audit</h1>
             <p class="mb-0 text-white-50 small" style="font-weight: 500;">Every infant and toddler deserves developmental evaluation within 45 days · BigQuery ISO GQL Graph · Vertex AI Gemini</p>
           </div>
         </div>
@@ -537,15 +537,11 @@ def index():
             <button id="btnTrack4" type="button" class="btn btn-sm btn-outline-light track-nav-btn fw-semibold" onclick="activateTrack(4)">
               🌱 Extra Credit: Simulator
             </button>
-            <button id="btnTrack2" type="button" class="btn btn-sm btn-outline-light track-nav-btn" onclick="activateTrack(2)">
-              <i class="fa-solid fa-network-wired me-1"></i> Track 2: This Quarter's Audit
-            </button>
-            <button id="btnTrack3" type="button" class="btn btn-sm btn-outline-light track-nav-btn" onclick="activateTrack(3)">
-              <i class="fa-solid fa-van-shuttle me-1"></i> Track 3: Outreach Season
-            </button>
             <button id="btnTrack5" type="button" class="btn btn-sm btn-outline-light track-nav-btn" onclick="activateTrack(5)">
               <i class="fa-solid fa-map-location-dot me-1"></i> 🗺️ Network Map &amp; Traces
             </button>
+            <button id="btnTrack2" type="button" class="d-none" onclick="activateTrack(2)"></button>
+            <button id="btnTrack3" type="button" class="d-none" onclick="activateTrack(3)"></button>
           </div>
         </div>
         <div id="trackBannerInfo" class="small text-white px-3 py-1 rounded-pill" style="background: rgba(255,255,255,0.2); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.35);">
@@ -717,7 +713,7 @@ def index():
               <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1" id="navigatorStatusBadge"><i class="fa-solid fa-circle text-success me-1" style="font-size: 7px;"></i>Navigator Online</span>
             </div>
             <div id="chatBox" class="chat-box mb-3">
-              <div class="msg-agent" id="chatWelcomeMsg">👋 <strong>Hello Coordinator! I am Maya, your Milestone Navigator.</strong>
+              <div class="msg-agent" id="chatWelcomeMsg">👋 <strong>Hello Coordinator! I am Maya, your EarlyBridge Milestone Navigator.</strong>
 
 I partner with you to ensure every infant and toddler reaches their developmental evaluation well within the federal 45-day statutory IFSP clock.
 
@@ -739,7 +735,14 @@ I partner with you to ensure every infant and toddler reaches their developmenta
             </div>
 
             <div class="input-group">
+              <input type="text" id="userInput" class="form-control py-2" placeholder="Ask Maya (e.g. Find a pathway for a 20-month-old in ZIP 10451 on Medicaid)..." onkeydown="if(event.key==='Enter') sendMessage()" style="border-radius: 0.85rem 0 0 0.85rem;">
+              <button class="btn btn-primary px-4 fw-bold" id="btnSendMessage" onclick="sendMessage()" style="border-radius: 0 0.85rem 0.85rem 0;"><i class="fa-solid fa-paper-plane me-1"></i> Send</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+  </div>
 
     <!-- ========================================== -->
     <!-- EXTRA CREDIT: SINGLE NETWORK FIX SIMULATOR -->
@@ -881,9 +884,9 @@ I partner with you to ensure every infant and toddler reaches their developmenta
     </div>
 
     <!-- ========================================== -->
-    <!-- TRACK 2 PANE: THIS QUARTER'S AUDIT -->
+    <!-- TRACK 2 PANE: THIS QUARTER'S AUDIT (HIDDEN) -->
     <!-- ========================================== -->
-    <div id="trackPane2" class="track-pane">
+    <div id="trackPane2" class="track-pane" style="display: none !important;">
       <!-- Track 2 Header Banner & Diagnosis -->
       <div class="row mb-4">
         <div class="col-12">
@@ -971,9 +974,9 @@ I partner with you to ensure every infant and toddler reaches their developmenta
     </div>
 
     <!-- ========================================== -->
-    <!-- TRACK 3 PANE: OUTREACH SEASON -->
+    <!-- TRACK 3 PANE: OUTREACH SEASON (HIDDEN) -->
     <!-- ========================================== -->
-    <div id="trackPane3" class="track-pane">
+    <div id="trackPane3" class="track-pane" style="display: none !important;">
       <div class="row">
         <!-- Community Equity & Mobile Screening Priorities -->
         <div class="col-12">
@@ -1485,17 +1488,24 @@ I partner with you to ensure every infant and toddler reaches their developmenta
     }
 
     function activateTrack(trackNum) {
-      // Toggle button active states
+      // Toggle button active states and pane visibility
       for (let i = 1; i <= 5; i++) {
         const btn = document.getElementById('btnTrack' + i);
         const pane = document.getElementById('trackPane' + i);
         if (btn) {
-          if (i === trackNum) {
+          if (btn.classList.contains('d-none')) {
+            // Keep hidden buttons invisible
+          } else if (i === trackNum) {
             btn.className = 'btn btn-sm btn-light track-nav-btn active';
-            if (pane) pane.classList.add('active');
           } else {
             btn.className = 'btn btn-sm btn-outline-light track-nav-btn';
-            if (pane) pane.classList.remove('active');
+          }
+        }
+        if (pane) {
+          if (i === trackNum) {
+            pane.classList.add('active');
+          } else {
+            pane.classList.remove('active');
           }
         }
       }
@@ -1505,23 +1515,23 @@ I partner with you to ensure every infant and toddler reaches their developmenta
       const cfg = STATE_DATA[activeState];
 
       if (trackNum === 1) {
-        info.innerHTML = "<strong>Track 1 Active:</strong> Route today's toddler referral (&le;45d compliant path with 36m age cliff guard).";
-        input.value = `Route a 20-month-old Spanish-speaking Medicaid toddler in ${cfg.county} tract ${cfg.tract}.`;
+        if (info) info.innerHTML = "<strong>Track 1 Active:</strong> Route today's toddler referral (&le;45d compliant path with 36m age cliff guard).";
+        if (input) input.value = `Route a 20-month-old Spanish-speaking Medicaid toddler in ${cfg.county} tract ${cfg.tract}.`;
       } else if (trackNum === 2) {
-        info.innerHTML = "<strong>Track 2 Active:</strong> Variable-length GQL exposes systemic paper-fax bounce hubs breaking federal clock.";
-        input.value = `Trace 3-to-4 hop referral chains breaching 45 days in ${activeState} and identify the regional bounce hubs.`;
+        if (info) info.innerHTML = "<strong>Track 2 Active:</strong> Variable-length GQL exposes systemic paper-fax bounce hubs breaking federal clock.";
+        if (input) input.value = `Trace 3-to-4 hop referral chains breaching 45 days in ${activeState} and identify the regional bounce hubs.`;
       } else if (trackNum === 3) {
-        info.innerHTML = "<strong>Track 3 Active:</strong> Combine ACS under-5 poverty & NSCH screening baselines to deploy mobile screening days.";
-        input.value = `Where should community developmental screening outreach days go first in ${cfg.name}?`;
-        loadEquityAuditData();
+        if (info) info.innerHTML = "<strong>Track 3 Active:</strong> Combine ACS under-5 poverty & NSCH screening baselines to deploy mobile screening days.";
+        if (input) input.value = `Where should community developmental screening outreach days go first in ${cfg.name}?`;
+        if (typeof loadEquityAuditData === 'function') loadEquityAuditData();
       } else if (trackNum === 4) {
-        info.innerHTML = "<strong>Extra Credit Active:</strong> Graph Simulation — Compute how many breached cases drop &le;45d when converting one paper-fax coordinator to electronic intake + bilingual pre-checking.";
-        input.value = "Simulate network fix: how many breached cases drop under 45 days if Walton Regional Desk (SYN-PROV-NY-011) switches to electronic intake with pre-checked bilingual slots?";
+        if (info) info.innerHTML = "<strong>Extra Credit Active:</strong> Graph Simulation — Compute how many breached cases drop &le;45d when converting one paper-fax coordinator to electronic intake + bilingual pre-checking.";
+        if (input) input.value = "Simulate network fix: how many breached cases drop under 45 days if Walton Regional Desk (SYN-PROV-NY-011) switches to electronic intake with pre-checked bilingual slots?";
         const simEl = document.getElementById('simResultsArea');
         if (simEl) simEl.scrollIntoView({ behavior: 'smooth' });
       } else if (trackNum === 5) {
-        info.innerHTML = "<strong>Network Map &amp; Traces Active:</strong> Geographic GIS overlay of all 30 CareNodes, 89 Census tracts, and BigQuery execution trace audit log.";
-        input.value = `Inspect geographic coverage and BigQuery multi-agent execution traces for active New York care network.`;
+        if (info) info.innerHTML = "<strong>Network Map &amp; Traces Active:</strong> Geographic GIS overlay of all 30 CareNodes, 89 Census tracts, and BigQuery execution trace audit log.";
+        if (input) input.value = `Inspect geographic coverage and BigQuery multi-agent execution traces for active New York care network.`;
         if (typeof initPhysicalMap === 'function') initPhysicalMap();
         if (leafletMap) {
           setTimeout(() => leafletMap.invalidateSize(), 150);
